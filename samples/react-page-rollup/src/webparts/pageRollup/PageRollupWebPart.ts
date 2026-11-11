@@ -1,0 +1,550 @@
+import * as React from 'react';
+import * as ReactDom from 'react-dom';
+import { Version } from '@microsoft/sp-core-library';
+import { DisplayMode } from '@microsoft/sp-core-library';
+import { IReadonlyTheme, ThemeChangedEventArgs, ThemeProvider } from '@microsoft/sp-component-base';
+import {
+  IPropertyPaneConfiguration,
+  IPropertyPaneDropdownOption,
+  IPropertyPaneField,
+  PropertyPaneChoiceGroup,
+  PropertyPaneDropdown,
+  PropertyPaneHorizontalRule,
+  PropertyPaneLabel,
+  PropertyPaneSlider,
+  PropertyPaneTextField,
+  PropertyPaneToggle
+} from '@microsoft/sp-property-pane';
+import { BaseClientSideWebPart } from '@microsoft/sp-webpart-base';
+
+import * as strings from 'PageRollupWebPartStrings';
+import { PageRollup, IPageRollupProps } from '../../components/PageRollup';
+import { IRollupDisplay } from '../../components/RollupTile';
+import {
+  FilterOperator,
+  IPageRollupWebPartProps,
+  IRollupField,
+  IRollupList,
+  IRollupQuery
+} from '../../models/IPageRollupProps';
+import { RollupService, SITE_PAGES_TEMPLATE } from '../../services/RollupService';
+import { describeDateWindow } from '../../utils/dateRange';
+import { parseFilterValues } from '../../utils/fieldValues';
+
+const NONE = '';
+const DEFAULTS: Partial<IPageRollupWebPartProps> = {
+  title: '',
+  siteUrl: '',
+  listId: '',
+  publishedOnly: true,
+  newsOnly: false,
+  filterMatch: 'all',
+  filter1Operator: 'eq',
+  filter2Operator: 'eq',
+  filter3Operator: 'eq',
+  dateField: 'FirstPublishedDate',
+  dateRange: 'all',
+  lastDays: 30,
+  sortBy: 'dateDesc',
+  maxItems: 12,
+  layout: 'tiles',
+  hoverEffect: 'zoom',
+  showOverlay: true,
+  overlayStyle: 'gradient',
+  overlayField1: 'Title',
+  overlayField2: 'Description',
+  overlayField3: '',
+  overlayField4: '',
+  overlayField5: '',
+  showFieldLabels: false,
+  thumbnailField: '',
+  showViews: true,
+  viewsPeriod: 'lifetime',
+  openInNewTab: false,
+  sizeMode: 'auto',
+  fixedHeight: 480,
+  columns: 0,
+  tileSize: 260,
+  aspectRatio: '16:9',
+  gap: 16,
+  cornerRadius: 12
+};
+
+export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollupWebPartProps> {
+  private _service!: RollupService;
+  private _theme: IReadonlyTheme | undefined;
+  private _lists: IRollupList[] = [];
+  private _fields: IRollupField[] = [];
+  private _loadingLists = false;
+  private _loadingFields = false;
+  private _sourceError = '';
+
+  protected async onInit(): Promise<void> {
+    await super.onInit();
+
+    Object.keys(DEFAULTS).forEach((key) => {
+      const k = key as keyof IPageRollupWebPartProps;
+      if (this.properties[k] === undefined || this.properties[k] === null) {
+        (this.properties as unknown as Record<string, unknown>)[k] = DEFAULTS[k];
+      }
+    });
+
+    this._service = new RollupService(this.context.spHttpClient, this.context.pageContext.web.absoluteUrl);
+
+    const themeProvider = this.context.serviceScope.consume(ThemeProvider.serviceKey);
+    this._theme = themeProvider.tryGetTheme();
+    themeProvider.themeChangedEvent.add(this, (args: ThemeChangedEventArgs) => {
+      this._theme = args.theme;
+      this.render();
+    });
+
+    // Newly added web part: point it at this site's Site Pages library so it works straight away.
+    if (!this.properties.listId) {
+      try {
+        const lists = await this._service.getLists(this.properties.siteUrl);
+        const pages = lists.filter((l) => l.baseTemplate === SITE_PAGES_TEMPLATE)[0];
+        if (pages) {
+          this.properties.listId = pages.id;
+        }
+        this._lists = lists;
+      } catch {
+        // Leave unconfigured; the placeholder asks the editor to pick a library.
+      }
+    }
+    if (this.properties.listId) {
+      this._fields = await this._service.getFields(this.properties.siteUrl, this.properties.listId).catch(() => []);
+    }
+  }
+
+  public render(): void {
+    const p = this.properties;
+    const list = this._lists.filter((l) => l.id === p.listId)[0];
+    const isPagesLibrary = list ? list.baseTemplate === SITE_PAGES_TEMPLATE : this._fields.some((f) => f.internalName === 'BannerImageUrl');
+
+    const overlayFields = [p.overlayField1, p.overlayField2, p.overlayField3, p.overlayField4, p.overlayField5].filter((f) => !!f);
+    const fieldTitles: Record<string, string> = {};
+    this._fields.forEach((f) => {
+      fieldTitles[f.internalName] = f.title;
+    });
+
+    const query: IRollupQuery = {
+      siteUrl: p.siteUrl,
+      listId: p.listId,
+      isPagesLibrary,
+      publishedOnly: p.publishedOnly,
+      newsOnly: p.newsOnly,
+      filterMatch: p.filterMatch,
+      filters: [
+        { field: p.filter1Field, operator: p.filter1Operator, values: parseFilterValues(p.filter1Value) },
+        { field: p.filter2Field, operator: p.filter2Operator, values: parseFilterValues(p.filter2Value) },
+        { field: p.filter3Field, operator: p.filter3Operator, values: parseFilterValues(p.filter3Value) }
+      ].filter((f) => !!f.field),
+      dateField: p.dateField,
+      dateRange: p.dateRange,
+      lastDays: p.lastDays,
+      sortBy: p.sortBy,
+      maxItems: Math.max(1, p.maxItems || 12),
+      displayFields: overlayFields,
+      thumbnailField: p.thumbnailField,
+      includeViews: p.showViews,
+      viewsPeriod: p.viewsPeriod
+    };
+
+    const display: IRollupDisplay = {
+      layout: p.layout,
+      showOverlay: p.showOverlay,
+      overlayStyle: p.overlayStyle,
+      overlayFields,
+      fieldTitles,
+      showFieldLabels: p.showFieldLabels,
+      showViews: p.showViews,
+      viewsPeriod: p.viewsPeriod,
+      openInNewTab: p.openInNewTab
+    };
+
+    const element: React.ReactElement<IPageRollupProps> = React.createElement(PageRollup, {
+      service: this._service,
+      query,
+      display,
+      size: {
+        sizeMode: p.sizeMode,
+        fixedHeight: p.fixedHeight,
+        columns: p.columns,
+        tileSize: p.tileSize,
+        aspectRatio: p.aspectRatio,
+        gap: p.gap,
+        cornerRadius: p.cornerRadius
+      },
+      hoverEffect: p.hoverEffect,
+      title: p.title,
+      dateLabel: describeDateWindow(p.dateRange, p.lastDays),
+      isConfigured: !!p.listId,
+      isEditMode: this.displayMode === DisplayMode.Edit,
+      onConfigure: () => this.context.propertyPane.open(),
+      themeVars: this._themeVars()
+    });
+
+    ReactDom.render(element, this.domElement);
+  }
+
+  private _themeVars(): Record<string, string> {
+    const t = this._theme;
+    const s = (t && t.semanticColors) || {};
+    const pal = (t && t.palette) || {};
+    return {
+      '--pr-primary': pal.themePrimary || '#0f6cbd',
+      '--pr-primary-soft': pal.themeLighter || 'rgba(15,108,189,0.12)',
+      '--pr-on-primary': pal.white || '#ffffff',
+      '--pr-text': s.bodyText || '#242424',
+      '--pr-subtle': s.bodySubtext || '#616161',
+      '--pr-card': s.bodyBackground || '#ffffff',
+      '--pr-border': s.bodyDivider || s.variantBorder || '#e0e0e0'
+    };
+  }
+
+  protected onDispose(): void {
+    ReactDom.unmountComponentAtNode(this.domElement);
+  }
+
+  protected get dataVersion(): Version {
+    return Version.parse('1.0');
+  }
+
+  // ----- Property pane -------------------------------------------------------
+
+  protected onPropertyPaneConfigurationStart(): void {
+    if (this._lists.length === 0) {
+      this._loadLists().catch(() => undefined);
+    }
+    if (this.properties.listId && this._fields.length === 0) {
+      this._loadFields().catch(() => undefined);
+    }
+  }
+
+  protected onPropertyPaneFieldChanged(propertyPath: string, oldValue: unknown, newValue: unknown): void {
+    super.onPropertyPaneFieldChanged(propertyPath, oldValue, newValue);
+    if (oldValue === newValue) {
+      return;
+    }
+    if (propertyPath === 'siteUrl') {
+      this.properties.listId = '';
+      this._lists = [];
+      this._fields = [];
+      this._loadLists().catch(() => undefined);
+    }
+    if (propertyPath === 'listId') {
+      this._fields = [];
+      this._loadFields(true).catch(() => undefined);
+    }
+  }
+
+  private async _loadLists(): Promise<void> {
+    this._loadingLists = true;
+    this._sourceError = '';
+    this.context.propertyPane.refresh();
+    try {
+      this._lists = await this._service.getLists(this.properties.siteUrl);
+      if (!this.properties.listId) {
+        const pages = this._lists.filter((l) => l.baseTemplate === SITE_PAGES_TEMPLATE)[0];
+        if (pages) {
+          this.properties.listId = pages.id;
+          await this._loadFields(true);
+        }
+      }
+    } catch (e) {
+      this._lists = [];
+      this._sourceError = `${strings.SiteLoadError} ${(e as Error).message}`;
+    }
+    this._loadingLists = false;
+    this.context.propertyPane.refresh();
+    this.render();
+  }
+
+  private async _loadFields(applyDefaults?: boolean): Promise<void> {
+    if (!this.properties.listId) {
+      return;
+    }
+    this._loadingFields = true;
+    this.context.propertyPane.refresh();
+    try {
+      this._fields = await this._service.getFields(this.properties.siteUrl, this.properties.listId);
+      const has = (n: string): boolean => this._fields.some((f) => f.internalName === n);
+      if (applyDefaults || !has(this.properties.dateField)) {
+        this.properties.dateField = has('FirstPublishedDate') ? 'FirstPublishedDate' : 'Created';
+      }
+      if (applyDefaults) {
+        this.properties.overlayField2 = has('Description') ? 'Description' : has('Modified') ? 'Modified' : '';
+        this.properties.thumbnailField = '';
+        ['filter1Field', 'filter2Field', 'filter3Field'].forEach((k) => {
+          const key = k as 'filter1Field' | 'filter2Field' | 'filter3Field';
+          if (this.properties[key] && !has(this.properties[key])) {
+            this.properties[key] = '';
+          }
+        });
+      }
+    } catch {
+      this._fields = [];
+    }
+    this._loadingFields = false;
+    this.context.propertyPane.refresh();
+    this.render();
+  }
+
+  private _fieldOptions(filter?: (f: IRollupField) => boolean, noneLabel: string = strings.NoneOption): IPropertyPaneDropdownOption[] {
+    const options: IPropertyPaneDropdownOption[] = [{ key: NONE, text: noneLabel }];
+    this._fields.filter(filter || (() => true)).forEach((f) => options.push({ key: f.internalName, text: `${f.title}` }));
+    return options;
+  }
+
+  private _filterFields(n: 1 | 2 | 3): IPropertyPaneField<unknown>[] {
+    const fieldKey = `filter${n}Field` as 'filter1Field';
+    const opKey = `filter${n}Operator` as 'filter1Operator';
+    const out: IPropertyPaneField<unknown>[] = [
+      PropertyPaneDropdown(fieldKey, {
+        label: `${strings.FilterLabel} ${n}`,
+        options: this._fieldOptions((f) => f.type !== 'Thumbnail' && f.type !== 'URL'),
+        disabled: this._loadingFields
+      })
+    ];
+    if (this.properties[fieldKey]) {
+      const op: FilterOperator = this.properties[opKey];
+      out.push(
+        PropertyPaneDropdown(opKey, {
+          label: strings.OperatorLabel,
+          options: [
+            { key: 'eq', text: strings.OpEquals },
+            { key: 'neq', text: strings.OpNotEquals },
+            { key: 'contains', text: strings.OpContains },
+            { key: 'empty', text: strings.OpEmpty },
+            { key: 'notEmpty', text: strings.OpNotEmpty }
+          ]
+        })
+      );
+      if (op !== 'empty' && op !== 'notEmpty') {
+        out.push(
+          PropertyPaneTextField(`filter${n}Value`, {
+            label: strings.ValueLabel,
+            placeholder: strings.ValuePlaceholder,
+            description: n === 1 ? strings.ValueDescription : undefined,
+            deferredValidationTime: 500
+          })
+        );
+      }
+    }
+    return out;
+  }
+
+  protected getPropertyPaneConfiguration(): IPropertyPaneConfiguration {
+    const p = this.properties;
+    const list = this._lists.filter((l) => l.id === p.listId)[0];
+    const isPages = list ? list.baseTemplate === SITE_PAGES_TEMPLATE : this._fields.some((f) => f.internalName === 'BannerImageUrl');
+
+    const listOptions: IPropertyPaneDropdownOption[] = this._lists.map((l) => ({
+      key: l.id,
+      text: l.baseTemplate === SITE_PAGES_TEMPLATE ? `${l.title} (${strings.PagesTag})` : l.title
+    }));
+
+    const sourceFields: IPropertyPaneField<unknown>[] = [
+      PropertyPaneTextField('title', { label: strings.TitleLabel, placeholder: strings.TitlePlaceholder }),
+      PropertyPaneTextField('siteUrl', {
+        label: strings.SiteUrlLabel,
+        placeholder: this.context.pageContext.web.absoluteUrl,
+        description: strings.SiteUrlDescription,
+        deferredValidationTime: 800,
+        onGetErrorMessage: (v: string) => (!v || /^https:\/\/[^/]+/i.test(v.trim()) ? '' : strings.SiteUrlError)
+      }),
+      PropertyPaneDropdown('listId', {
+        label: strings.LibraryLabel,
+        options: listOptions,
+        disabled: this._loadingLists || listOptions.length === 0,
+        selectedKey: p.listId
+      })
+    ];
+    if (this._loadingLists) {
+      sourceFields.push(PropertyPaneLabel('loadingLists', { text: strings.Loading }));
+    }
+    if (this._sourceError) {
+      sourceFields.push(PropertyPaneLabel('sourceError', { text: this._sourceError }));
+    }
+    if (isPages) {
+      sourceFields.push(
+        PropertyPaneToggle('publishedOnly', { label: strings.PublishedOnlyLabel, onText: strings.On, offText: strings.Off }),
+        PropertyPaneToggle('newsOnly', { label: strings.NewsOnlyLabel, onText: strings.On, offText: strings.Off })
+      );
+    }
+
+    const filterFields: IPropertyPaneField<unknown>[] = [
+      PropertyPaneLabel('filterHelp', { text: strings.FilterHelp }),
+      ...this._filterFields(1),
+      ...(p.filter1Field ? this._filterFields(2) : []),
+      ...(p.filter1Field && p.filter2Field ? this._filterFields(3) : [])
+    ];
+    if (p.filter1Field && p.filter2Field) {
+      filterFields.push(
+        PropertyPaneChoiceGroup('filterMatch', {
+          label: strings.FilterMatchLabel,
+          options: [
+            { key: 'all', text: strings.MatchAll },
+            { key: 'any', text: strings.MatchAny }
+          ]
+        })
+      );
+    }
+
+    const dateFields: IPropertyPaneField<unknown>[] = [
+      PropertyPaneDropdown('dateField', {
+        label: strings.DateFieldLabel,
+        options: this._fieldOptions((f) => f.type === 'DateTime').filter((o) => o.key !== NONE),
+        selectedKey: p.dateField
+      }),
+      PropertyPaneDropdown('dateRange', {
+        label: strings.DateRangeLabel,
+        options: [
+          { key: 'all', text: strings.RangeAll },
+          { key: 'lastDays', text: strings.RangeLastDays },
+          { key: 'thisQuarter', text: strings.RangeThisQuarter },
+          { key: 'lastQuarter', text: strings.RangeLastQuarter },
+          { key: 'thisYear', text: strings.RangeThisYear }
+        ]
+      })
+    ];
+    if (p.dateRange === 'lastDays') {
+      dateFields.push(PropertyPaneSlider('lastDays', { label: strings.LastDaysLabel, min: 1, max: 365, step: 1, showValue: true }));
+    }
+    dateFields.push(
+      PropertyPaneDropdown('sortBy', {
+        label: strings.SortLabel,
+        options: [
+          { key: 'dateDesc', text: strings.SortNewest },
+          { key: 'dateAsc', text: strings.SortOldest },
+          { key: 'title', text: strings.SortTitle },
+          { key: 'views', text: strings.SortViews }
+        ]
+      }),
+      PropertyPaneSlider('maxItems', { label: strings.MaxItemsLabel, min: 1, max: 50, step: 1, showValue: true })
+    );
+
+    const overlayFieldOptions = this._fieldOptions((f) => f.type !== 'Thumbnail');
+    const displayFields: IPropertyPaneField<unknown>[] = [
+      PropertyPaneChoiceGroup('layout', {
+        label: strings.LayoutLabel,
+        options: [
+          { key: 'tiles', text: strings.LayoutTiles, iconProps: { officeFabricIconFontName: 'Tiles' } },
+          { key: 'cards', text: strings.LayoutCards, iconProps: { officeFabricIconFontName: 'GridViewMedium' } },
+          { key: 'hero', text: strings.LayoutHero, iconProps: { officeFabricIconFontName: 'ViewDashboard' } },
+          { key: 'mosaic', text: strings.LayoutMosaic, iconProps: { officeFabricIconFontName: 'GridViewLarge' } },
+          { key: 'filmstrip', text: strings.LayoutFilmstrip, iconProps: { officeFabricIconFontName: 'Slideshow' } },
+          { key: 'list', text: strings.LayoutList, iconProps: { officeFabricIconFontName: 'ViewList' } }
+        ]
+      }),
+      PropertyPaneDropdown('hoverEffect', {
+        label: strings.HoverLabel,
+        options: [
+          { key: 'zoom', text: strings.HoverZoom },
+          { key: 'lift', text: strings.HoverLift },
+          { key: 'reveal', text: strings.HoverReveal },
+          { key: 'none', text: strings.HoverNone }
+        ]
+      }),
+      PropertyPaneDropdown('thumbnailField', {
+        label: strings.ThumbnailLabel,
+        options: this._fieldOptions((f) => f.type === 'Thumbnail' || f.type === 'URL', strings.ThumbnailAuto)
+      }),
+      PropertyPaneHorizontalRule(),
+      PropertyPaneToggle('showOverlay', { label: strings.ShowOverlayLabel, onText: strings.On, offText: strings.Off })
+    ];
+    if (p.showOverlay) {
+      if (p.layout !== 'cards' && p.layout !== 'list') {
+        displayFields.push(
+          PropertyPaneDropdown('overlayStyle', {
+            label: strings.OverlayStyleLabel,
+            options: [
+              { key: 'gradient', text: strings.OverlayGradient },
+              { key: 'glass', text: strings.OverlayGlass },
+              { key: 'solid', text: strings.OverlaySolid }
+            ]
+          })
+        );
+      }
+      displayFields.push(
+        PropertyPaneDropdown('overlayField1', { label: strings.OverlayField1Label, options: overlayFieldOptions, selectedKey: p.overlayField1 }),
+        PropertyPaneDropdown('overlayField2', { label: `${strings.OverlayFieldLabel} 2`, options: overlayFieldOptions, selectedKey: p.overlayField2 }),
+        PropertyPaneDropdown('overlayField3', { label: `${strings.OverlayFieldLabel} 3`, options: overlayFieldOptions, selectedKey: p.overlayField3 }),
+        PropertyPaneDropdown('overlayField4', { label: `${strings.OverlayFieldLabel} 4`, options: overlayFieldOptions, selectedKey: p.overlayField4 }),
+        PropertyPaneDropdown('overlayField5', { label: `${strings.OverlayFieldLabel} 5`, options: overlayFieldOptions, selectedKey: p.overlayField5 }),
+        PropertyPaneToggle('showFieldLabels', { label: strings.ShowFieldLabels, onText: strings.On, offText: strings.Off })
+      );
+    }
+    displayFields.push(
+      PropertyPaneHorizontalRule(),
+      PropertyPaneToggle('showViews', { label: strings.ShowViewsLabel, onText: strings.On, offText: strings.Off })
+    );
+    if (p.showViews) {
+      displayFields.push(
+        PropertyPaneDropdown('viewsPeriod', {
+          label: strings.ViewsPeriodLabel,
+          options: [
+            { key: 'lifetime', text: strings.ViewsLifetime },
+            { key: 'recent', text: strings.ViewsRecent }
+          ]
+        })
+      );
+    }
+    displayFields.push(PropertyPaneToggle('openInNewTab', { label: strings.NewTabLabel, onText: strings.On, offText: strings.Off }));
+
+    const sizeFields: IPropertyPaneField<unknown>[] = [
+      PropertyPaneChoiceGroup('sizeMode', {
+        label: strings.SizeModeLabel,
+        options: [
+          { key: 'auto', text: strings.SizeAuto },
+          { key: 'fixed', text: strings.SizeFixed }
+        ]
+      })
+    ];
+    if (p.sizeMode === 'fixed') {
+      sizeFields.push(PropertyPaneSlider('fixedHeight', { label: strings.FixedHeightLabel, min: 150, max: 1400, step: 10, showValue: true }));
+    }
+    sizeFields.push(
+      PropertyPaneSlider('columns', { label: strings.ColumnsLabel, min: 0, max: 6, step: 1, showValue: true }),
+      PropertyPaneLabel('columnsHelp', { text: strings.ColumnsHelp })
+    );
+    if (!p.columns) {
+      sizeFields.push(PropertyPaneSlider('tileSize', { label: strings.TileSizeLabel, min: 140, max: 520, step: 10, showValue: true }));
+    }
+    sizeFields.push(
+      PropertyPaneDropdown('aspectRatio', {
+        label: strings.AspectLabel,
+        options: [
+          { key: '16:9', text: '16:9 (widescreen)' },
+          { key: '4:3', text: '4:3' },
+          { key: '1:1', text: '1:1 (square)' },
+          { key: '3:4', text: '3:4 (portrait)' }
+        ]
+      }),
+      PropertyPaneSlider('gap', { label: strings.GapLabel, min: 0, max: 40, step: 2, showValue: true }),
+      PropertyPaneSlider('cornerRadius', { label: strings.RadiusLabel, min: 0, max: 28, step: 1, showValue: true })
+    );
+
+    return {
+      pages: [
+        {
+          header: { description: strings.PageSource },
+          displayGroupsAsAccordion: true,
+          groups: [
+            { groupName: strings.GroupSource, groupFields: sourceFields },
+            { groupName: strings.GroupFilters, groupFields: filterFields, isCollapsed: !p.filter1Field },
+            { groupName: strings.GroupDates, groupFields: dateFields }
+          ]
+        },
+        {
+          header: { description: strings.PageDisplay },
+          groups: [{ groupName: strings.GroupDisplay, groupFields: displayFields }]
+        },
+        {
+          header: { description: strings.PageSize },
+          groups: [{ groupName: strings.GroupSize, groupFields: sizeFields }]
+        }
+      ]
+    };
+  }
+}

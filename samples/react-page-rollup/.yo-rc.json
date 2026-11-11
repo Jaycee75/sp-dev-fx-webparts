@@ -1,0 +1,19 @@
+{
+  "@microsoft/generator-sharepoint": {
+    "useGulp": false,
+    "plusBeta": false,
+    "isCreatingSolution": true,
+    "nodeVersion": "22.21.1",
+    "sdksVersions": {},
+    "version": "1.22.2",
+    "libraryName": "react-page-rollup",
+    "libraryId": "51fac271-d69c-405e-8001-e8c4886c0db8",
+    "environment": "spo",
+    "packageManager": "npm",
+    "solutionName": "react-page-rollup",
+    "solutionShortDescription": "Page rollup web part with thumbnail tiles, column filters and date windows",
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "componentType": "webpart"
+  }
+}

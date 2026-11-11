@@ -1,0 +1,18 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/config.2.0.schema.json",
+  "version": "2.0",
+  "bundles": {
+    "page-rollup-web-part": {
+      "components": [
+        {
+          "entrypoint": "./lib/webparts/pageRollup/PageRollupWebPart.js",
+          "manifest": "./src/webparts/pageRollup/PageRollupWebPart.manifest.json"
+        }
+      ]
+    }
+  },
+  "externals": {},
+  "localizedResources": {
+    "PageRollupWebPartStrings": "lib/webparts/pageRollup/loc/{locale}.js"
+  }
+}

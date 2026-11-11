@@ -1,0 +1,40 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "page-rollup",
+    "id": "3acc03f3-7dd3-473e-aa60-cb0461aeb6ef",
+    "version": "1.0.0.0",
+    "includeClientSideAssets": true,
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "developer": {
+      "name": "",
+      "websiteUrl": "",
+      "privacyUrl": "",
+      "termsOfUseUrl": "",
+      "mpnId": "Undefined-1.22.2"
+    },
+    "metadata": {
+      "shortDescription": {
+        "default": "Page Rollup web part"
+      },
+      "longDescription": {
+        "default": "Shows a rollup of pages or documents from a chosen site and library as modern thumbnail tiles, with column filters, date windows, view counts and several layouts."
+      },
+      "screenshotPaths": [],
+      "videoUrl": "",
+      "categories": []
+    },
+    "features": [
+      {
+        "title": "Page Rollup",
+        "description": "Page Rollup web part.",
+        "id": "42133bd5-f232-4a33-a6b7-474d50e6dd0a",
+        "version": "1.0.0.0"
+      }
+    ]
+  },
+  "paths": {
+    "zippedPackage": "solution/page-rollup.sppkg"
+  }
+}
