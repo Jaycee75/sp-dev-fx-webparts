@@ -25,15 +25,26 @@ gulp.task('dev', gulpSequence('clean', 'bundle', 'package-solution'));
 build.configureWebpack.mergeConfig({
   additionalConfiguration: (generatedConfiguration) => {
 
-    generatedConfiguration.resolve.alias = { handlebars: 'handlebars/dist/handlebars.min.js' };
+    generatedConfiguration.resolve.alias = {
+      ...(generatedConfiguration.resolve.alias || {}),
+      handlebars: 'handlebars/dist/handlebars.min.js'
+    };
 
-    /*generatedConfiguration.module.rules.push(
-      { test: /\.js$/, loader: 'unlazy-loader' }
-    );*/
+    // handlebars-helpers (and create-frame) use lazy-cache style `require(name, alias)` calls
+    // that webpack cannot statically analyse; unlazy-loader rewrites them into plain requires.
+    generatedConfiguration.module.rules.push({
+      test: /node_modules[\\/](handlebars-helpers|create-frame)[\\/].*\.js$/,
+      loader: 'unlazy-loader'
+    });
 
-    generatedConfiguration.node = {
-      fs: 'empty'
-    }
+    // webpack 5 (used by @microsoft/sp-build-web 1.22.x) no longer polyfills Node core modules
+    // and rejects the old `node: { fs: 'empty' }` setting, so configure resolve.fallback instead.
+    generatedConfiguration.resolve.fallback = {
+      ...(generatedConfiguration.resolve.fallback || {}),
+      fs: false,
+      path: require.resolve('path-browserify'),
+      url: require.resolve('url/')
+    };
 
     return generatedConfiguration;
   }
