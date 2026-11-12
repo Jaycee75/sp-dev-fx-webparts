@@ -1,6 +1,7 @@
 import * as React from 'react';
 import styles from './PageRollup.module.scss';
-import { AspectRatio, HoverEffect, IRollupItem, IRollupQuery, SizeMode } from '../models/IPageRollupProps';
+import { AspectRatio, HoverEffect, IRollupItem, IRollupQuery, SizeMode, TitleAlign, TitleSize } from '../models/IPageRollupProps';
+import { RollupHeading } from './RollupHeading';
 import { RollupService } from '../services/RollupService';
 import { IRollupDisplay, RollupTile } from './RollupTile';
 import { ICarouselOptions, SocialCarousel, SpotlightCarousel, TickerCarousel } from './Carousels';
@@ -23,6 +24,11 @@ export interface IPageRollupProps {
   hoverEffect: HoverEffect;
   carousel: ICarouselOptions;
   title: string;
+  titleSize: TitleSize;
+  titleAlign: TitleAlign;
+  titlePlaceholder: string;
+  onTitleChange: (title: string) => void;
+  onTitleFormatChange: (size: TitleSize, align: TitleAlign) => void;
   dateLabel: string;
   isConfigured: boolean;
   isEditMode: boolean;
@@ -191,13 +197,18 @@ export const PageRollup: React.FC<IPageRollupProps> = (props) => {
   };
 
   // ----- Render helpers -----------------------------------------------------------
-  const header =
-    title || dateLabel ? (
-      <div className={styles.header}>
-        {title && <h2 className={styles.heading}>{title}</h2>}
-        {dateLabel && <span className={styles.chip}>{dateLabel}</span>}
-      </div>
-    ) : null;
+  const header = (
+    <RollupHeading
+      title={title}
+      size={props.titleSize}
+      align={props.titleAlign}
+      chip={dateLabel}
+      isEditMode={isEditMode}
+      placeholder={props.titlePlaceholder}
+      onTitleChange={props.onTitleChange}
+      onFormatChange={props.onTitleFormatChange}
+    />
+  );
 
   const renderState = (heading: string, text: string, isError?: boolean, button?: boolean): JSX.Element => (
     <div className={`${styles.state} ${isError ? styles.error : ''}`} role={isError ? 'alert' : 'status'}>

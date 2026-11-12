@@ -4,6 +4,7 @@ A SharePoint Framework web part that rolls up pages (or documents) from a site a
 
 ## What it does
 
+- **Heading**: type it straight onto the page in edit mode, like SharePoint's own web part titles. A small toolbar above it sets the size (S, M, L, XL) and alignment (left, centre, right). The heading is hidden on the published page when it's empty.
 - **Source**: any site in the tenant (blank = the current site) and any document library. Site Pages is picked automatically when the web part is added.
 - **Column filters**: up to 3 filters on library columns (text, choice, managed metadata / tags, people, lookup, yes/no, number). Conditions are *is*, *is not*, *contains*, *is empty* and *has a value*. Separate several values with `;`. You can require all filters or any filter to match.
   - Example: library = Site Pages, filter = `Tags` *is* `Lesson Learning`.
@@ -82,5 +83,6 @@ The package is created at `sharepoint/solution/page-rollup.sppkg`. Upload it to 
 | --- | --- | --- |
 | 1.0.0 | November 2026 | Initial release |
 | 1.1.0 | November 2026 | Spotlight, card and slide-up carousels; sharper images; new mosaic pattern |
+| 1.4.0 | November 2026 | Inline-editable heading with size and alignment toolbar |
 | 1.3.0 | November 2026 | Document previews (thumbnail API with fallbacks), file-type placeholders, picture fit option, Document Rollup toolbox entry |
 | 1.2.0 | November 2026 | Hover details column (full text) in all layouts; picture background for Spotlight; card carousel arrows moved beside the dots |

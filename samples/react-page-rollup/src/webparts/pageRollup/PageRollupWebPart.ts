@@ -34,6 +34,8 @@ import { parseFilterValues } from '../../utils/fieldValues';
 const NONE = '';
 const DEFAULTS: Partial<IPageRollupWebPartProps> = {
   title: '',
+  titleSize: 'medium',
+  titleAlign: 'left',
   siteUrl: '',
   listId: '',
   publishedOnly: true,
@@ -218,6 +220,19 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
         tickerRows: p.tickerRows
       },
       title: p.title,
+      titleSize: p.titleSize,
+      titleAlign: p.titleAlign,
+      titlePlaceholder: strings.InlineTitlePlaceholder,
+      onTitleChange: (value: string) => {
+        // Save as you type; no re-render needed because the heading keeps its own text
+        this.properties.title = value;
+      },
+      onTitleFormatChange: (size, align) => {
+        this.properties.titleSize = size;
+        this.properties.titleAlign = align;
+        this.render();
+        this.context.propertyPane.refresh();
+      },
       dateLabel: describeDateWindow(p.dateRange, p.lastDays),
       isConfigured: !!p.listId,
       isEditMode: this.displayMode === DisplayMode.Edit,
@@ -396,7 +411,24 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
     }));
 
     const sourceFields: IPropertyPaneField<unknown>[] = [
-      PropertyPaneTextField('title', { label: strings.TitleLabel, placeholder: strings.TitlePlaceholder }),
+      PropertyPaneTextField('title', { label: strings.TitleLabel, placeholder: strings.TitlePlaceholder, description: strings.TitleInlineHelp }),
+      PropertyPaneDropdown('titleSize', {
+        label: strings.TitleSizeLabel,
+        options: [
+          { key: 'small', text: strings.SizeSmall },
+          { key: 'medium', text: strings.SizeMedium },
+          { key: 'large', text: strings.SizeLarge },
+          { key: 'xlarge', text: strings.SizeXLarge }
+        ]
+      }),
+      PropertyPaneChoiceGroup('titleAlign', {
+        label: strings.TitleAlignLabel,
+        options: [
+          { key: 'left', text: strings.AlignLeft, iconProps: { officeFabricIconFontName: 'AlignLeft' } },
+          { key: 'center', text: strings.AlignCenter, iconProps: { officeFabricIconFontName: 'AlignCenter' } },
+          { key: 'right', text: strings.AlignRight, iconProps: { officeFabricIconFontName: 'AlignRight' } }
+        ]
+      }),
       PropertyPaneTextField('siteUrl', {
         label: strings.SiteUrlLabel,
         placeholder: this.context.pageContext.web.absoluteUrl,

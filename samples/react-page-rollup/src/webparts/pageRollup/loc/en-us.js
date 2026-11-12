@@ -133,6 +133,17 @@ define([], function() {
     "BgDimLabel": "Darken the background (%)",
     "ImageFitLabel": "Picture fit",
     "FitCover": "Fill the tile (crop to fit)",
-    "FitContain": "Show the whole picture or page"
+    "FitContain": "Show the whole picture or page",
+    "InlineTitlePlaceholder": "Add a heading",
+    "TitleInlineHelp": "You can also type the heading straight onto the page in edit mode.",
+    "TitleSizeLabel": "Heading size",
+    "SizeSmall": "Small",
+    "SizeMedium": "Medium",
+    "SizeLarge": "Large",
+    "SizeXLarge": "Extra large",
+    "TitleAlignLabel": "Heading alignment",
+    "AlignLeft": "Left",
+    "AlignCenter": "Centre",
+    "AlignRight": "Right"
   };
 });

@@ -133,6 +133,17 @@ declare interface IPageRollupWebPartStrings {
   ImageFitLabel: string;
   FitCover: string;
   FitContain: string;
+  InlineTitlePlaceholder: string;
+  TitleInlineHelp: string;
+  TitleSizeLabel: string;
+  SizeSmall: string;
+  SizeMedium: string;
+  SizeLarge: string;
+  SizeXLarge: string;
+  TitleAlignLabel: string;
+  AlignLeft: string;
+  AlignCenter: string;
+  AlignRight: string;
 }
 
 declare module 'PageRollupWebPartStrings' {

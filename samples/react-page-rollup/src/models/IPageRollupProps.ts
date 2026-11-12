@@ -2,6 +2,8 @@ export type RollupLayout = 'cards' | 'tiles' | 'hero' | 'mosaic' | 'filmstrip' |
 export type CarouselBackground = 'none' | 'theme' | 'blur' | 'image' | 'color' | 'gradient';
 export type ImageQuality = 'sharp' | 'fast';
 export type ImageFit = 'cover' | 'contain';
+export type TitleSize = 'small' | 'medium' | 'large' | 'xlarge';
+export type TitleAlign = 'left' | 'center' | 'right';
 export type HoverEffect = 'zoom' | 'lift' | 'reveal' | 'none';
 export type OverlayStyle = 'gradient' | 'glass' | 'solid';
 export type DateRange = 'all' | 'lastDays' | 'thisQuarter' | 'lastQuarter' | 'thisYear';
@@ -14,6 +16,8 @@ export type ViewsPeriod = 'lifetime' | 'recent';
 /** Every setting stored by the web part (flat, so the built-in property pane can edit it). */
 export interface IPageRollupWebPartProps {
   title: string;
+  titleSize: TitleSize;
+  titleAlign: TitleAlign;
 
   // Source
   siteUrl: string;
