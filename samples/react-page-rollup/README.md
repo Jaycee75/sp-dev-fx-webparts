@@ -28,7 +28,7 @@ A SharePoint Framework web part that rolls up pages (or documents) from a site a
   - **Card carousel**: social-media style post cards (header, picture, views, caption) sliding along. Column 2 is the card header (e.g. author) and column 3 the line under it (e.g. date).
   - **Slide-up ticker**: a column of tiles; the top one slides up and away and the next rises in from the bottom.
 - **Carousel motion**: move on automatically (seconds per item), slide speed, pause on hover, loop, arrows and dots. Every carousel can also be swiped on touch screens, dragged with the mouse, clicked, or moved with the arrow keys.
-- **Picture quality**: *Sharp* (default) uses the full-size picture. *Faster loading* uses SharePoint-resized copies sized to each tile. Banner images that SharePoint stored as small previews are unwrapped to the original picture.
+- **Picture quality**: *Sharp* (default) uses SharePoint-resized copies sized for each tile, at high-DPI resolution, and switches to the full-size picture if a copy comes back too small. *Faster loading* uses smaller copies, and *Original* always uses the full-size picture. Banner images that SharePoint stored as small previews are unwrapped to the original picture.
 - **Three text styles**: dark gradient, frosted glass, or a solid theme-colour band.
 - **Hover effects**: zoom the picture, lift the tile, reveal details, or do nothing. With *Reveal details* you pick a **details column** (e.g. Description). Its full text, line breaks included, appears across the middle of the tile, card or slide on hover, and long text scrolls. Works in every layout, including the carousels.
 - **Sizing**:
@@ -68,6 +68,17 @@ Notes:
 - View counts come from the search index, so new pages may show 0 views for a while.
 - Sorting by the date column on a library with more than 5,000 items needs that column to be indexed.
 
+## Performance
+
+- **Fast start-up:** the web part draws straight away and loads data in the background. It doesn't hold up page loading or SharePoint's web part start-up timing.
+- **No phantom edits:** default settings are applied when read, not written back. Opening a page in edit mode doesn't mark the web part as changed, so it doesn't create a new draft.
+- **Shared caches:** library lists, columns and site IDs are shared between every Page Rollup on the page and kept for 15 minutes in the browser session. Results are kept for 5 minutes and shown instantly, then refreshed if more than a minute old.
+- **Fewer requests:** view counts load after the tiles are shown. Without filters, only the rows needed are read. With filters, rows are read in batches of 500.
+- **Lighter pictures:**
+  - *Sharp*, the default, uses SharePoint-resized copies sized for each tile, and switches to the full-size picture only if a copy comes back too small.
+  - Carousels only load pictures for slides near the screen.
+  - Autoplay pauses while the carousel is scrolled out of view.
+
 ## Build
 
 Requires Node.js 22 (`>=22.14.0 <23`).
@@ -88,6 +99,7 @@ The package is created at `sharepoint/solution/page-rollup.sppkg`. Upload it to 
 | --- | --- | --- |
 | 1.0.0 | November 2026 | Initial release |
 | 1.1.0 | November 2026 | Spotlight, card and slide-up carousels; sharper images; new mosaic pattern |
+| 1.6.0 | November 2026 | Performance: non-blocking start-up, no default writes (no phantom drafts), shared caches, deferred view counts, sized pictures, lazy carousel images, off-screen autoplay pause |
 | 1.5.0 | November 2026 | Likes and comments counts (with Most liked sort) alongside views |
 | 1.4.0 | November 2026 | Inline-editable heading with size and alignment toolbar |
 | 1.3.0 | November 2026 | Document previews (thumbnail API with fallbacks), file-type placeholders, picture fit option, Document Rollup toolbox entry |

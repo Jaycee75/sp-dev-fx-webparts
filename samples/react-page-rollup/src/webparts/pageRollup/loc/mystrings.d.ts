@@ -148,6 +148,7 @@ declare interface IPageRollupWebPartStrings {
   ShowCommentsLabel: string;
   SortLikes: string;
   SocialHelp: string;
+  ImageOriginal: string;
 }
 
 declare module 'PageRollupWebPartStrings' {

@@ -35,12 +35,70 @@ export interface IRollupResult {
   items: IRollupItem[];
   scanned: number;
   truncated: boolean;
+  /** True when view counts still need loading with loadViews() (they are fetched after the tiles are shown). */
+  viewsPending?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Caches shared by every Page Rollup on the page (and kept for a while in sessionStorage),
+// so several web parts, or the same one re-created when switching edit/view, don't refetch.
+// ---------------------------------------------------------------------------
+
+const META_TTL = 15 * 60 * 1000; // libraries, columns, site ids
+const RESULT_TTL = 5 * 60 * 1000; // items shown instantly from cache, then refreshed
+const STORE_PREFIX = 'pageRollup:v1:';
+const memory: Record<string, { at: number; value: unknown }> = {};
+const inflight: Record<string, Promise<unknown>> = {};
+
+function readStore<T>(key: string, ttl: number): T | undefined {
+  const hit = memory[key];
+  if (hit && Date.now() - hit.at < ttl) return hit.value as T;
+  try {
+    const raw = window.sessionStorage.getItem(STORE_PREFIX + key);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { at: number; value: T };
+      if (Date.now() - parsed.at < ttl) {
+        memory[key] = parsed;
+        return parsed.value;
+      }
+    }
+  } catch {
+    // storage blocked or full: memory cache only
+  }
+  return undefined;
+}
+
+function writeStore(key: string, value: unknown): void {
+  const entry = { at: Date.now(), value };
+  memory[key] = entry;
+  try {
+    window.sessionStorage.setItem(STORE_PREFIX + key, JSON.stringify(entry));
+  } catch {
+    // ignore
+  }
+}
+
+/** Runs the loader once per key at a time and caches the result. */
+function cached<T>(key: string, ttl: number, load: () => Promise<T>): Promise<T> {
+  const hit = readStore<T>(key, ttl);
+  if (hit !== undefined) return Promise.resolve(hit);
+  if (!inflight[key]) {
+    inflight[key] = load().then(
+      (v) => {
+        delete inflight[key];
+        writeStore(key, v);
+        return v;
+      },
+      (e) => {
+        delete inflight[key];
+        throw e;
+      }
+    );
+  }
+  return inflight[key] as Promise<T>;
 }
 
 export class RollupService {
-  private _fieldCache: Record<string, IRollupField[]> = {};
-  private _listCache: Record<string, IRollupList[]> = {};
-  private _idCache: Record<string, Promise<IWebIds | undefined>> = {};
 
   constructor(private _http: SPHttpClient, private _currentWebUrl: string) {}
 
@@ -51,27 +109,20 @@ export class RollupService {
 
   public async getLists(siteUrl: string): Promise<IRollupList[]> {
     const web = this.resolveSiteUrl(siteUrl);
-    if (this._listCache[web]) {
-      return this._listCache[web];
-    }
-    const data = await this._get(
-      `${web}/_api/web/lists?$filter=Hidden eq false and BaseType eq 1&$select=Id,Title,BaseTemplate&$orderby=Title`
-    );
-    const lists: IRollupList[] = (data.value || []).map((l: any) => ({
-      id: l.Id,
-      title: l.Title,
-      baseTemplate: l.BaseTemplate
-    }));
-    this._listCache[web] = lists;
-    return lists;
+    return cached(`lists|${web}`, META_TTL, async () => {
+      const data = await this._get(
+        `${web}/_api/web/lists?$filter=Hidden eq false and BaseType eq 1&$select=Id,Title,BaseTemplate&$orderby=Title`
+      );
+      return (data.value || []).map((l: any) => ({ id: l.Id, title: l.Title, baseTemplate: l.BaseTemplate })) as IRollupList[];
+    });
   }
 
   public async getFields(siteUrl: string, listId: string): Promise<IRollupField[]> {
     const web = this.resolveSiteUrl(siteUrl);
-    const key = `${web}|${listId}`;
-    if (this._fieldCache[key]) {
-      return this._fieldCache[key];
-    }
+    return cached(`fields|${web}|${listId}`, META_TTL, () => this._loadFields(web, listId));
+  }
+
+  private async _loadFields(web: string, listId: string): Promise<IRollupField[]> {
     const data = await this._get(
       `${web}/_api/web/lists(guid'${listId}')/fields?$select=InternalName,Title,TypeAsString,Hidden`
     );
@@ -83,20 +134,39 @@ export class RollupService {
       .filter((f: any) => (seen[f.InternalName] ? false : (seen[f.InternalName] = true)))
       .map((f: any) => ({ internalName: f.InternalName, title: f.Title, type: f.TypeAsString }))
       .sort((a: IRollupField, b: IRollupField) => a.title.localeCompare(b.title));
-    this._fieldCache[key] = fields;
     return fields;
   }
 
-  public async getItems(query: IRollupQuery): Promise<IRollupResult> {
-    const web = this.resolveSiteUrl(query.siteUrl);
+  /** Items from the last fetch of this exact query, if recent, with how old they are (ms). */
+  public peekResult(query: IRollupQuery): { result: IRollupResult; age: number } | undefined {
+    const key = this._resultKey(query);
+    const hit = readStore<IRollupResult>(key, RESULT_TTL);
+    return hit ? { result: hit, age: Date.now() - (memory[key] ? memory[key].at : Date.now()) } : undefined;
+  }
+
+  public storeResult(query: IRollupQuery, result: IRollupResult): void {
+    writeStore(this._resultKey(query), result);
+  }
+
+  private _resultKey(query: IRollupQuery): string {
+    return `items|${this.resolveSiteUrl(query.siteUrl)}|${JSON.stringify(query)}`;
+  }
+
+  /**
+   * @param deferViews when true, view counts are not fetched here (unless sorting by views); the caller shows the
+   *                   tiles first and then calls loadViews().
+   */
+  public async getItems(originalQuery: IRollupQuery, deferViews?: boolean): Promise<IRollupResult> {
+    const web = this.resolveSiteUrl(originalQuery.siteUrl);
     const origin = new URL(web).origin;
-    const fields = await this.getFields(web, query.listId);
-    const ids = query.isPagesLibrary ? undefined : await this._getWebIds(web);
+    const fields = await this.getFields(web, originalQuery.listId);
     const has = (name: string): boolean => fields.some((f) => f.internalName === name);
+    // Work out from the columns whether this is a Site Pages library (no extra request needed)
+    const query: IRollupQuery = { ...originalQuery, isPagesLibrary: originalQuery.isPagesLibrary || (has('BannerImageUrl') && has('PromotedState')) };
+    const ids = query.isPagesLibrary ? undefined : await this._getWebIds(web);
 
     const dateField = has(query.dateField) ? query.dateField : 'Created';
     const clientFilters = query.filters.filter((f) => f.field && has(f.field));
-    const needsClientFiltering = clientFilters.length > 0 || query.isPagesLibrary;
     const sortByLikes = query.sortBy === 'likes';
     // Both need every candidate before sorting, so they scan instead of stopping at the limit
     const sortByViews = query.sortBy === 'views' || sortByLikes;
@@ -114,7 +184,10 @@ export class RollupService {
       ...(query.includeSocial || sortByLikes ? [likeField, commentField] : [])
     ]).filter((f) => ALWAYS_SELECT.indexOf(f) !== -1 || has(f));
 
-    const viewXml = this._buildViewXml(query, dateField, viewFields, has, needsClientFiltering || sortByViews ? 100 : query.maxItems);
+    // Scanning (filters / most viewed / most liked) reads big batches to keep round trips down;
+    // otherwise just enough rows for the limit, plus a few spare to skip page templates.
+    const scanning = clientFilters.length > 0 || sortByViews;
+    const viewXml = this._buildViewXml(query, dateField, viewFields, has, scanning ? 500 : query.maxItems + (query.isPagesLibrary ? 10 : 0));
     const maxScan = sortByViews ? 1000 : 2000;
     const target = query.maxItems;
 
@@ -164,8 +237,12 @@ export class RollupService {
       // Trim before looking up views so the search query only names the items shown
       items = items.slice().sort((a, b) => (b.likes || 0) - (a.likes || 0)).slice(0, target);
     }
-    if (query.includeViews || (sortByViews && !sortByLikes)) {
-      await this._attachViews(web, query.listId, items, sortByViews && !sortByLikes);
+    const sortingByViewCount = sortByViews && !sortByLikes;
+    if (query.includeViews && deferViews && !sortingByViewCount) {
+      return { items: items.slice(0, target), scanned, truncated, viewsPending: true };
+    }
+    if (query.includeViews || sortingByViewCount) {
+      await this._attachViews(web, query.listId, items, sortingByViewCount);
       if (sortByViews && !sortByLikes) {
         const pick = (i: IRollupItem): number => (query.viewsPeriod === 'recent' ? i.viewsRecent : i.viewsLifetime) || 0;
         items = items.slice().sort((a, b) => pick(b) - pick(a));
@@ -173,6 +250,13 @@ export class RollupService {
     }
 
     return { items: items.slice(0, target), scanned, truncated };
+  }
+
+  /** Adds view counts to items already on screen (returns new objects). */
+  public async loadViews(query: IRollupQuery, items: IRollupItem[]): Promise<IRollupItem[]> {
+    const copy = items.map((i) => ({ ...i }));
+    await this._attachViews(this.resolveSiteUrl(query.siteUrl), query.listId, copy, false);
+    return copy;
   }
 
   // ---------------------------------------------------------------------------
@@ -310,13 +394,13 @@ export class RollupService {
 
   /** Site and web ids for a site address (cached), needed for document thumbnails. */
   private _getWebIds(web: string): Promise<IWebIds | undefined> {
-    if (!this._idCache[web]) {
-      this._idCache[web] = Promise.all([this._get(`${web}/_api/site?$select=Id`), this._get(`${web}/_api/web?$select=Id`)])
-        .then(([site, w]) => ({ host: new URL(web).hostname, siteId: String(site.Id), webId: String(w.Id) }))
-        .catch(() => undefined);
-    }
-    return this._idCache[web];
+    return cached(`ids|${web}`, META_TTL, () =>
+      Promise.all([this._get(`${web}/_api/site?$select=Id`), this._get(`${web}/_api/web?$select=Id`)]).then(
+        ([site, w]) => ({ host: new URL(web).hostname, siteId: String(site.Id), webId: String(w.Id) }) as IWebIds
+      )
+    ).catch(() => undefined);
   }
+
 
   /**
    * Banner images are often stored as an already-shrunk preview or thumbnail URL, which looks blurry on big tiles.

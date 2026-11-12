@@ -1,6 +1,6 @@
 export type RollupLayout = 'cards' | 'tiles' | 'hero' | 'mosaic' | 'filmstrip' | 'list' | 'spotlight' | 'social' | 'ticker';
 export type CarouselBackground = 'none' | 'theme' | 'blur' | 'image' | 'color' | 'gradient';
-export type ImageQuality = 'sharp' | 'fast';
+export type ImageQuality = 'sharp' | 'fast' | 'original';
 export type ImageFit = 'cover' | 'contain';
 export type TitleSize = 'small' | 'medium' | 'large' | 'xlarge';
 export type TitleAlign = 'left' | 'center' | 'right';

@@ -53,6 +53,8 @@ export interface IRollupTileProps {
   imgWidth?: number;
   /** Set false to suppress the hover details panel (e.g. side slides in the spotlight). */
   allowDetails?: boolean;
+  /** Don't load the picture yet (carousel slides that are far from view). */
+  deferImage?: boolean;
   style?: React.CSSProperties;
 }
 
@@ -171,36 +173,57 @@ export const Placeholder: React.FC<{ item: IRollupItem }> = ({ item }) => {
 /** SharePoint preview handler sizes (approximate longest edge in px) for its resolution parameter. */
 const PREVIEW_SIZES = [300, 480, 750, 1024, 1600, 2560];
 
+function pixelTarget(quality: ImageQuality, cssWidth: number): number {
+  const dpr = typeof window !== 'undefined' && window.devicePixelRatio ? Math.min(window.devicePixelRatio, 2) : 1;
+  // "sharp" asks for enough pixels for high-resolution screens; "fast" for standard screens
+  return Math.max(200, Math.round((cssWidth || 400) * (quality === 'fast' ? 1 : Math.max(dpr, 1.5))));
+}
+
 /**
- * Picture sources in the order to try them. "sharp" prefers the full-size image (the browser scales it down);
- * "fast" prefers a SharePoint-resized copy that is just big enough for the tile.
+ * Picture sources in the order to try them.
+ * "sharp" (default) and "fast": a SharePoint-resized copy sized for the tile first, the full-size picture as backup.
+ * "original": the full-size picture first (sharpest, but the largest downloads).
  */
 export function pickImageSources(item: IRollupItem, quality: ImageQuality, cssWidth: number): string[] {
-  const dpr = typeof window !== 'undefined' && window.devicePixelRatio ? Math.min(window.devicePixelRatio, 2) : 1;
-  const px = Math.max(200, Math.round((cssWidth || 400) * dpr));
+  const px = pixelTarget(quality, cssWidth);
   let res = PREVIEW_SIZES.findIndex((size) => size >= px);
   if (res === -1) res = PREVIEW_SIZES.length - 1;
   const preview = item.previewBase ? `${item.previewBase}&resolution=${res}` : '';
   const thumb = item.thumbTemplate ? item.thumbTemplate.replace('{W}', String(Math.ceil(px / 100) * 100)) : '';
 
-  const order = quality === 'fast' ? [thumb, preview, item.originalImage] : [item.originalImage, thumb, preview];
+  const order = quality === 'original' ? [item.originalImage, thumb, preview] : [thumb, preview, item.originalImage];
   order.push(...(item.extraSources || []));
   return order.filter((s, i, a) => !!s && a.indexOf(s) === i);
 }
 
-export const TileImage: React.FC<{ item: IRollupItem; quality: ImageQuality; width?: number; fit?: ImageFit }> = ({ item, quality, width, fit }) => {
+export const TileImage: React.FC<{ item: IRollupItem; quality: ImageQuality; width?: number; fit?: ImageFit; defer?: boolean }> = ({
+  item,
+  quality,
+  width,
+  fit,
+  defer
+}) => {
   // Bucket the width so resizing the page doesn't keep swapping images
   const bucket = Math.ceil((width || 400) / 200) * 200;
   const sources = React.useMemo(() => pickImageSources(item, quality, bucket), [item, quality, bucket]);
   const [index, setIndex] = React.useState(0);
+  const [shown, setShown] = React.useState(!defer);
   React.useEffect(() => setIndex(0), [sources.join('|')]);
+  // Once a carousel slide has come near the screen, keep its picture
+  React.useEffect(() => {
+    if (!defer) setShown(true);
+  }, [defer]);
 
   if (index >= sources.length) {
     return <Placeholder item={item} />;
   }
+  if (!shown) {
+    return null;
+  }
   // Documents crop from the top so the title area of the first page shows; "contain" shows the whole picture
   const imgStyle: React.CSSProperties =
     fit === 'contain' ? { objectFit: 'contain' } : item.isDocument ? { objectPosition: 'center top' } : {};
+  const isLast = index >= sources.length - 1;
   return (
     <img
       src={sources[index]}
@@ -211,11 +234,19 @@ export const TileImage: React.FC<{ item: IRollupItem; quality: ImageQuality; wid
       className={fit === 'contain' ? styles.imgContain : undefined}
       style={imgStyle}
       onError={() => setIndex(index + 1)}
+      onLoad={(e) => {
+        // A resized copy that came back much smaller than the tile would look blurry: try the next source
+        const img = e.currentTarget;
+        const need = pixelTarget(quality, bucket);
+        if (!isLast && quality !== 'original' && img.naturalWidth > 0 && img.naturalWidth < need * 0.55 && img.naturalHeight < need * 0.55) {
+          setIndex(index + 1);
+        }
+      }}
     />
   );
 };
 
-export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, mediaRatio, large, imgWidth, allowDetails = true, style }) => {
+export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, mediaRatio, large, imgWidth, allowDetails = true, deferImage, style }) => {
   const { layout, showOverlay, overlayStyle, overlayFields, fieldTitles, showFieldLabels } = display;
   const stats = getStats(item, display);
   // List rows have small thumbnails, so their counts go in the text instead of a badge on the picture
@@ -288,7 +319,7 @@ export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, 
       style={{ ...(height ? { height } : {}), ...(textBelow ? {} : { minHeight: height || 120 }), ...style }}
     >
       <div className={`${styles.media} ${textBelow ? '' : styles.mediaFill}`} style={mediaStyle}>
-        <TileImage item={item} quality={display.imageQuality} fit={display.imageFit} width={isList ? Math.min(220, (imgWidth || 300) * 0.3) : imgWidth} />
+        <TileImage item={item} quality={display.imageQuality} fit={display.imageFit} defer={deferImage} width={isList ? Math.min(220, (imgWidth || 300) * 0.3) : imgWidth} />
       </div>
       {stats.length > 0 && !statsInline && (
         <span className={styles.views} aria-label={stats.map((st) => `${st.value} ${st.label}`).join(', ')}>

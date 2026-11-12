@@ -120,8 +120,8 @@ define([], function() {
     "BgColourTo": "Gradient end colour",
     "ColourError": "Use a hex colour such as #1b1f3b",
     "ImageQualityLabel": "Picture quality",
-    "ImageSharp": "Sharp (full-size pictures)",
-    "ImageFast": "Faster loading (SharePoint-resized pictures)",
+    "ImageSharp": "Sharp (sized for each tile; recommended)",
+    "ImageFast": "Faster loading (smaller pictures)",
     "DetailsFieldLabel": "Details column (shown on hover)",
     "DetailsNone": "(none - just slide up the other columns)",
     "DetailsHelp": "When someone hovers over a tile, card or slide, this column's full text appears across the middle of it. Long text scrolls. Works with every layout.",
@@ -148,6 +148,7 @@ define([], function() {
     "ShowLikesLabel": "Show likes",
     "ShowCommentsLabel": "Show comments",
     "SortLikes": "Most liked",
-    "SocialHelp": "Likes and comments are shown for site pages. For a document library, turn on Library settings > Rating settings > Likes to give it a likes count. Counts appear in the corner of each tile (and under the picture on the card carousel)."
+    "SocialHelp": "Likes and comments are shown for site pages. For a document library, turn on Library settings > Rating settings > Likes to give it a likes count. Counts appear in the corner of each tile (and under the picture on the card carousel).",
+    "ImageOriginal": "Original full-size pictures (slowest)"
   };
 });

@@ -31,6 +31,8 @@ export interface IPageRollupProps {
   onTitleFormatChange: (size: TitleSize, align: TitleAlign) => void;
   dateLabel: string;
   isConfigured: boolean;
+  /** True while the web part is still working out which library to use (shows the loading skeleton). */
+  pending?: boolean;
   isEditMode: boolean;
   onConfigure: () => void;
   themeVars: Record<string, string>;
@@ -84,12 +86,19 @@ function useWidth(ref: React.RefObject<HTMLDivElement>): number {
       window.addEventListener('resize', onResize);
       return () => window.removeEventListener('resize', onResize);
     }
+    // Batch to one update per frame, and ignore small changes such as a page scrollbar appearing,
+    // which could otherwise make the layout flip back and forth.
+    let frame = 0;
     const ro = new ResizeObserver((entries) => {
       const w = Math.floor(entries[0].contentRect.width);
-      setWidth((prev) => (Math.abs(prev - w) > 1 ? w : prev));
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => setWidth((prev) => (prev === 0 || Math.abs(prev - w) > 20 ? w : prev)));
     });
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => {
+      cancelAnimationFrame(frame);
+      ro.disconnect();
+    };
   }, []);
   return width;
 }
@@ -107,37 +116,72 @@ export const PageRollup: React.FC<IPageRollupProps> = (props) => {
 
   // ----- Data ---------------------------------------------------------------
   const queryKey = JSON.stringify(query);
+  const firstLoad = React.useRef(true);
   React.useEffect(() => {
-    if (!isConfigured) {
-      setLoading(false);
+    if (!isConfigured || props.pending) {
+      setLoading(!!props.pending);
       return undefined;
     }
     let cancelled = false;
-    setLoading(true);
     setError('');
-    // Small delay so typing in the property pane doesn't fire a request per keystroke
-    const timer = window.setTimeout(() => {
+
+    // 1. Show the last result for these settings straight away (shared across web parts and edit/view switches)
+    const hit = service.peekResult(query);
+    if (hit) {
+      setItems(hit.result.items);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+    // Recent enough: no need to ask SharePoint again
+    if (hit && hit.age < 60 * 1000 && !hit.result.viewsPending) {
+      firstLoad.current = false;
+      return undefined;
+    }
+
+    const run = (): void => {
       service
-        .getItems(query)
+        .getItems(query, true)
         .then((result) => {
-          if (!cancelled) {
-            setItems(result.items);
-            setLoading(false);
+          if (cancelled) return;
+          // 2. Tiles first...
+          setItems(result.items);
+          setLoading(false);
+          service.storeResult(query, result);
+          // 3. ...then view counts, which come from a slower search request
+          if (result.viewsPending && result.items.length > 0) {
+            service
+              .loadViews(query, result.items)
+              .then((withViews) => {
+                if (cancelled) return;
+                setItems(withViews);
+                service.storeResult(query, { ...result, items: withViews, viewsPending: false });
+              })
+              .catch(() => undefined);
           }
         })
         .catch((e: Error) => {
           if (!cancelled) {
             setError(e.message || String(e));
-            setItems([]);
+            if (!hit) setItems([]);
             setLoading(false);
           }
         });
-    }, 400);
+    };
+
+    // First load runs immediately; later changes (typing in the property pane) wait a moment
+    let timer = 0;
+    if (firstLoad.current) {
+      firstLoad.current = false;
+      run();
+    } else {
+      timer = window.setTimeout(run, 400);
+    }
     return () => {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [queryKey, isConfigured]);
+  }, [queryKey, isConfigured, props.pending]);
 
   // ----- Geometry -------------------------------------------------------------
   const layout = display.layout;
@@ -225,7 +269,7 @@ export const PageRollup: React.FC<IPageRollupProps> = (props) => {
 
   let content: JSX.Element;
 
-  if (!isConfigured) {
+  if (!isConfigured && !props.pending) {
     content = isEditMode
       ? renderState('Page Rollup', 'Choose a site and library to roll up, then pick filters, a layout and the columns to show on each tile.', false, true)
       : <></>;

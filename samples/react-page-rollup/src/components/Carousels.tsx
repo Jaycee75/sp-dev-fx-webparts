@@ -60,6 +60,7 @@ interface IEngine {
   jumped: (i: number, r: number) => boolean;
   rootProps: React.HTMLAttributes<HTMLDivElement>;
   stageProps: React.HTMLAttributes<HTMLDivElement>;
+  rootRef: React.RefObject<HTMLDivElement>;
 }
 
 function useCarouselEngine(count: number, maxIndex: number, options: ICarouselOptions, axis: Axis, stepPx: number): IEngine {
@@ -72,6 +73,17 @@ function useCarouselEngine(count: number, maxIndex: number, options: ICarouselOp
   const start = React.useRef<{ x: number; y: number; id: number } | null>(null);
   const moved = React.useRef(false);
   const lastRel = React.useRef<Record<number, number>>({});
+  const rootRef = React.useRef<HTMLDivElement>(null);
+  const [onScreen, setOnScreen] = React.useState(true);
+
+  // Stop autoplay while the carousel is scrolled out of view (saves work and keeps the page responsive)
+  React.useEffect(() => {
+    const el = rootRef.current;
+    if (!el || typeof IntersectionObserver === 'undefined') return undefined;
+    const io = new IntersectionObserver((entries) => setOnScreen(entries[0].isIntersecting), { threshold: 0.1 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
 
   const go = React.useCallback(
     (n: number) => setIndex(loop ? mod(n, count) : Math.max(0, Math.min(maxIndex, n))),
@@ -86,7 +98,7 @@ function useCarouselEngine(count: number, maxIndex: number, options: ICarouselOp
   }, [count, maxIndex, loop]);
 
   // Autoplay
-  const paused = isDragging || (options.pauseOnHover && (hovered || focused));
+  const paused = !onScreen || isDragging || (options.pauseOnHover && (hovered || focused));
   React.useEffect(() => {
     if (!options.autoplay || paused || maxIndex <= 0) return undefined;
     const ms = Math.max(1000, (options.interval || 5) * 1000);
@@ -175,6 +187,7 @@ function useCarouselEngine(count: number, maxIndex: number, options: ICarouselOp
     isDragging,
     rel,
     jumped,
+    rootRef,
     rootProps: {
       onMouseEnter: () => setHovered(true),
       onMouseLeave: () => setHovered(false),
@@ -275,6 +288,7 @@ export const SpotlightCarousel: React.FC<ICarouselBaseProps> = ({ items, display
     <div
       className={`${styles.carousel} ${styles.spotlight}`}
       style={{ ...bgStyle, paddingTop: padY, paddingBottom: padY }}
+      ref={engine.rootRef}
       aria-roledescription="carousel"
       tabIndex={0}
       {...engine.rootProps}
@@ -316,7 +330,7 @@ export const SpotlightCarousel: React.FC<ICarouselBaseProps> = ({ items, display
                 }
               }}
             >
-              <RollupTile item={item} display={{ ...display, layout: 'tiles' }} height={slideH} large={isCurrent && slideW > 420} imgWidth={slideW} allowDetails={isCurrent} />
+              <RollupTile item={item} display={{ ...display, layout: 'tiles' }} height={slideH} large={isCurrent && slideW > 420} imgWidth={slideW} allowDetails={isCurrent} deferImage={abs > 2} />
             </div>
           );
         })}
@@ -340,13 +354,14 @@ export const SpotlightCarousel: React.FC<ICarouselBaseProps> = ({ items, display
 // 2. Social cards: Instagram-style post cards sliding along one at a time.
 // ---------------------------------------------------------------------------
 
-const SocialCard: React.FC<{ item: IRollupItem; display: IRollupDisplay; width: number; mediaH: number; height: number; quality: ImageQuality }> = ({
+const SocialCard: React.FC<{ item: IRollupItem; display: IRollupDisplay; width: number; mediaH: number; height: number; quality: ImageQuality; defer?: boolean }> = ({
   item,
   display,
   width,
   mediaH,
   height,
-  quality
+  quality,
+  defer
 }) => {
   const [headingField, ...metaFields] = display.overlayFields.length > 0 ? display.overlayFields : ['Title'];
   const heading = item.values[headingField] || item.title;
@@ -390,7 +405,7 @@ const SocialCard: React.FC<{ item: IRollupItem; display: IRollupDisplay; width: 
         </div>
       )}
       <div className={styles.socialMedia} style={{ height: mediaH }}>
-        <TileImage item={item} quality={quality} width={width} fit={display.imageFit} />
+        <TileImage item={item} quality={quality} width={width} fit={display.imageFit} defer={defer} />
         {showDetails && <DetailsPanel heading={heading} text={item.details || ''} compact={mediaH < 200} />}
       </div>
       <div className={styles.socialFoot}>
@@ -432,7 +447,8 @@ export const SocialCarousel: React.FC<ICarouselBaseProps & { visible: number }> 
   const loop = options.loop && maxIndex > 0;
 
   return (
-    <div className={`${styles.carousel} ${styles.socialWrap}`} aria-roledescription="carousel" tabIndex={0} {...engine.rootProps}>
+    <div className={`${styles.carousel} ${styles.socialWrap}`} ref={engine.rootRef}
+      aria-roledescription="carousel" tabIndex={0} {...engine.rootProps}>
       <div className={styles.stage} {...engine.stageProps} style={{ height: cardH + 8, ...engine.stageProps.style }}>
         {items.map((item, i) => {
           const r = engine.rel(i, loop ? -1 : -n);
@@ -450,7 +466,7 @@ export const SocialCarousel: React.FC<ICarouselBaseProps & { visible: number }> 
                 transition: transition(options.speed, engine.jumped(i, r), engine.isDragging)
               }}
             >
-              <SocialCard item={item} display={display} width={cardW} mediaH={mediaH} height={cardH} quality={display.imageQuality} />
+              <SocialCard item={item} display={display} width={cardW} mediaH={mediaH} height={cardH} quality={display.imageQuality} defer={hidden} />
             </div>
           );
         })}
@@ -492,7 +508,8 @@ export const TickerCarousel: React.FC<ICarouselBaseProps> = ({ items, display, o
   const stageH = rows * rowH + (rows - 1) * gap;
 
   return (
-    <div className={`${styles.carousel} ${styles.ticker}`} aria-roledescription="carousel" tabIndex={0} {...engine.rootProps}>
+    <div className={`${styles.carousel} ${styles.ticker}`} ref={engine.rootRef}
+      aria-roledescription="carousel" tabIndex={0} {...engine.rootProps}>
       <div className={styles.stage} {...engine.stageProps} style={{ height: stageH, ...engine.stageProps.style }}>
         {items.map((item, i) => {
           const r = engine.rel(i, loop ? -1 : -n);
@@ -511,7 +528,7 @@ export const TickerCarousel: React.FC<ICarouselBaseProps> = ({ items, display, o
                 transition: transition(options.speed, engine.jumped(i, r), engine.isDragging)
               }}
             >
-              <RollupTile item={item} display={{ ...display, layout: 'tiles' }} height={rowH} imgWidth={width} />
+              <RollupTile item={item} display={{ ...display, layout: 'tiles' }} height={rowH} imgWidth={width} deferImage={r < -1 || r > rows} />
             </div>
           );
         })}

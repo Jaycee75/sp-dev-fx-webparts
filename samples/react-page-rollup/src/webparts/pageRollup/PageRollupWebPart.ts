@@ -102,15 +102,14 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
   private _loadingFields = false;
   private _sourceError = '';
 
+  /** Library chosen automatically (Site Pages / Documents) for a new web part; kept in memory, not saved. */
+  private _autoListId = '';
+  private _booting = false;
+
   protected async onInit(): Promise<void> {
     await super.onInit();
-
-    Object.keys(DEFAULTS).forEach((key) => {
-      const k = key as keyof IPageRollupWebPartProps;
-      if (this.properties[k] === undefined || this.properties[k] === null) {
-        (this.properties as unknown as Record<string, unknown>)[k] = DEFAULTS[k];
-      }
-    });
+    // Don't write defaults into this.properties here: in edit mode SharePoint treats any property change
+    // as an edit and saves a draft. Defaults are applied when reading settings (see _settings()).
 
     this._service = new RollupService(this.context.spHttpClient, this.context.pageContext.web.absoluteUrl);
 
@@ -121,28 +120,63 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
       this.render();
     });
 
-    // Newly added web part: point it at this site's Site Pages library so it works straight away.
-    if (!this.properties.listId) {
+    // Nothing is awaited here, so the web part draws its loading state straight away.
+    // SharePoint times onInit and flags web parts that are slow to start.
+    this._bootstrap().catch(() => undefined);
+  }
+
+  /** Background start-up: pick a library for new web parts and load column names for labels. */
+  private async _bootstrap(): Promise<void> {
+    const listId = this.properties.listId;
+    if (!listId) {
+      this._booting = true;
       try {
         const lists = await this._service.getLists(this.properties.siteUrl);
-        const pages = this._defaultLibrary(lists);
-        if (pages) {
-          this.properties.listId = pages.id;
-        }
         this._lists = lists;
+        const lib = this._defaultLibrary(lists);
+        this._autoListId = lib ? lib.id : '';
       } catch {
         // Leave unconfigured; the placeholder asks the editor to pick a library.
       }
+      this._booting = false;
+      this.render();
     }
-    if (this.properties.listId) {
-      this._fields = await this._service.getFields(this.properties.siteUrl, this.properties.listId).catch(() => []);
+    const effective = this.properties.listId || this._autoListId;
+    if (effective) {
+      this._fields = await this._service.getFields(this.properties.siteUrl, effective).catch(() => []);
+      this.render(); // column titles for "Show column names"
+    }
+  }
+
+  /** Saved settings with defaults filled in for anything not set (without changing the saved properties). */
+  private _settings(): IPageRollupWebPartProps {
+    const merged = { ...DEFAULTS } as Record<string, unknown>;
+    const saved = this.properties as unknown as Record<string, unknown>;
+    Object.keys(saved).forEach((k) => {
+      if (saved[k] !== undefined && saved[k] !== null) merged[k] = saved[k];
+    });
+    const result = merged as unknown as IPageRollupWebPartProps;
+    result.listId = this.properties.listId || this._autoListId;
+    return result;
+  }
+
+  /** Before the editor changes anything, fill in the defaults so the property pane shows the real values. */
+  private _materialiseDefaults(): void {
+    const effective = this._settings();
+    const saved = this.properties as unknown as Record<string, unknown>;
+    Object.keys(DEFAULTS).forEach((k) => {
+      if (saved[k] === undefined || saved[k] === null) saved[k] = (effective as unknown as Record<string, unknown>)[k];
+    });
+    if (!this.properties.listId && this._autoListId) {
+      this.properties.listId = this._autoListId;
     }
   }
 
   public render(): void {
-    const p = this.properties;
-    const list = this._lists.filter((l) => l.id === p.listId)[0];
-    const isPagesLibrary = list ? list.baseTemplate === SITE_PAGES_TEMPLATE : this._fields.some((f) => f.internalName === 'BannerImageUrl');
+    const p = this._settings();
+    // The service works this out from the library's columns, so the query stays the same once columns load
+    // (a changed query would mean a second fetch).
+    const isPagesLibrary = false;
 
     const overlayFields = [p.overlayField1, p.overlayField2, p.overlayField3, p.overlayField4, p.overlayField5].filter((f) => !!f);
     const fieldTitles: Record<string, string> = {};
@@ -240,6 +274,7 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
       },
       dateLabel: describeDateWindow(p.dateRange, p.lastDays),
       isConfigured: !!p.listId,
+      pending: !p.listId && this._booting,
       isEditMode: this.displayMode === DisplayMode.Edit,
       onConfigure: () => this.context.propertyPane.open(),
       themeVars: this._themeVars()
@@ -274,6 +309,8 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
   // ----- Property pane -------------------------------------------------------
 
   protected onPropertyPaneConfigurationStart(): void {
+    this._materialiseDefaults();
+    this.context.propertyPane.refresh();
     if (this._lists.length === 0) {
       this._loadLists().catch(() => undefined);
     }
@@ -406,7 +443,7 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
   }
 
   protected getPropertyPaneConfiguration(): IPropertyPaneConfiguration {
-    const p = this.properties;
+    const p = this._settings();
     const list = this._lists.filter((l) => l.id === p.listId)[0];
     const isPages = list ? list.baseTemplate === SITE_PAGES_TEMPLATE : this._fields.some((f) => f.internalName === 'BannerImageUrl');
 
@@ -564,7 +601,8 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
         label: strings.ImageQualityLabel,
         options: [
           { key: 'sharp', text: strings.ImageSharp },
-          { key: 'fast', text: strings.ImageFast }
+          { key: 'fast', text: strings.ImageFast },
+          { key: 'original', text: strings.ImageOriginal }
         ]
       }),
       PropertyPaneHorizontalRule(),
