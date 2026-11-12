@@ -1,0 +1,158 @@
+.likeButton {
+  // Theme-aware defaults; --like-accent may be overridden inline.
+  --like-accent: #{'[theme:themePrimary, default:#0078d4]'};
+  --like-text: #{'[theme:bodyText, default:#323130]'};
+  --like-subtle-text: #{'[theme:bodySubtext, default:#605e5c]'};
+  --like-error: #{'[theme:errorText, default:#a4262c]'};
+  --like-on-accent: #ffffff;
+  --like-icon: 20px;
+  --like-font: 14px;
+  --like-pad-y: 6px;
+  --like-pad-x: 12px;
+  --like-gap: 8px;
+
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--like-gap);
+  color: var(--like-text);
+  font-size: var(--like-font);
+  font-family: inherit;
+
+  &.small {
+    --like-icon: 16px;
+    --like-font: 12px;
+    --like-pad-y: 4px;
+    --like-pad-x: 8px;
+    --like-gap: 6px;
+  }
+  &.large {
+    --like-icon: 28px;
+    --like-font: 16px;
+    --like-pad-y: 8px;
+    --like-pad-x: 16px;
+    --like-gap: 10px;
+  }
+  &.xlarge {
+    --like-icon: 40px;
+    --like-font: 20px;
+    --like-pad-y: 10px;
+    --like-pad-x: 20px;
+    --like-gap: 12px;
+  }
+
+  &.left { justify-content: flex-start; }
+  &.center { justify-content: center; text-align: center; }
+  &.right { justify-content: flex-end; text-align: right; }
+
+  &.stacked {
+    flex-direction: column;
+    &.left { align-items: flex-start; }
+    &.center { align-items: center; }
+    &.right { align-items: flex-end; }
+  }
+}
+
+.text {
+  font-weight: 600;
+}
+
+.controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--like-gap);
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--like-gap) * 0.75);
+  padding: var(--like-pad-y) var(--like-pad-x);
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--like-accent);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+
+  &:active:not(:disabled) { transform: scale(0.95); }
+  &:focus-visible {
+    outline: 2px solid var(--like-accent);
+    outline-offset: 2px;
+  }
+  &:disabled { cursor: default; }
+  &.busy { cursor: progress; }
+
+  // Unliked: muted icon; liked: accent colour.
+  &:not(.liked) { color: var(--like-subtle-text); }
+  &:not(.liked):hover:not(:disabled) { color: var(--like-accent); }
+
+  &.outline {
+    border-color: currentColor;
+  }
+  &.outline.liked {
+    background-color: color-mix(in srgb, var(--like-accent) 10%, transparent);
+  }
+
+  &.filled {
+    border-color: var(--like-accent);
+    color: var(--like-accent);
+  }
+  &.filled.liked {
+    background-color: var(--like-accent);
+    color: var(--like-on-accent);
+  }
+
+  &.subtle:hover:not(:disabled) {
+    background-color: color-mix(in srgb, var(--like-accent) 10%, transparent);
+  }
+}
+
+.icon {
+  width: var(--like-icon);
+  height: var(--like-icon);
+  font-size: var(--like-icon);
+  line-height: 1;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.emojiOff {
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+.pop {
+  animation: likePop 0.45s ease-out;
+}
+
+@keyframes likePop {
+  0% { transform: scale(1); }
+  30% { transform: scale(1.35); }
+  60% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pop { animation: none; }
+  .button { transition: none; }
+}
+
+.count {
+  font-variant-numeric: tabular-nums;
+}
+
+.message {
+  color: var(--like-subtle-text);
+  font-size: 12px;
+  font-style: italic;
+}
+
+.error {
+  color: var(--like-error);
+  font-size: 12px;
+}

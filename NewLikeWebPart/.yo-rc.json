@@ -1,0 +1,20 @@
+{
+  "@microsoft/generator-sharepoint": {
+    "plusBeta": false,
+    "useGulp": false,
+    "isCreatingSolution": true,
+    "nodeVersion": "22.21.1",
+    "sdksVersions": {},
+    "version": "1.22.2",
+    "libraryName": "new-like-web-part",
+    "libraryId": "dbf2ef83-5b94-45ea-890e-4f7e57dadbc8",
+    "environment": "spo",
+    "packageManager": "npm",
+    "framework": "react",
+    "solutionName": "new-like-web-part",
+    "solutionShortDescription": "A configurable Like / reaction button for SharePoint pages",
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "componentType": "webpart"
+  }
+}

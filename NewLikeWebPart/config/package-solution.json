@@ -1,0 +1,40 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/spfx-build/package-solution.schema.json",
+  "solution": {
+    "name": "new-like-web-part-client-side-solution",
+    "id": "dbf2ef83-5b94-45ea-890e-4f7e57dadbc8",
+    "version": "1.0.0.0",
+    "includeClientSideAssets": true,
+    "skipFeatureDeployment": true,
+    "isDomainIsolated": false,
+    "developer": {
+      "name": "",
+      "websiteUrl": "",
+      "privacyUrl": "",
+      "termsOfUseUrl": "",
+      "mpnId": "Undefined-1.22.2"
+    },
+    "metadata": {
+      "shortDescription": {
+        "default": "A configurable Like / reaction button for SharePoint pages"
+      },
+      "longDescription": {
+        "default": "Adds a Like button (thumbs up, heart, star or any emoji) to a modern SharePoint page. Uses the page's built-in likes or a SharePoint list, with configurable text, size, alignment and style."
+      },
+      "screenshotPaths": [],
+      "videoUrl": "",
+      "categories": []
+    },
+    "features": [
+      {
+        "title": "new-like-web-part Feature",
+        "description": "The feature that activates the Like web part.",
+        "id": "2b3412d2-6d55-45ad-bfd1-6254bb1c8e8c",
+        "version": "1.0.0.0"
+      }
+    ]
+  },
+  "paths": {
+    "zippedPackage": "solution/new-like-web-part.sppkg"
+  }
+}
