@@ -171,30 +171,50 @@ export const PageRollup: React.FC<IPageRollupProps> = (props) => {
           setItems(first);
           setLoading(false);
           service.storeResult(query, { ...result, items: first });
-          // 3. ...then fresh view counts (a slower search request) and "new" flags, side by side
-          const needNew = query.newDays > 0;
-          if ((result.viewsPending || needNew) && first.length > 0) {
-            Promise.all([
-              result.viewsPending ? service.loadViews(query, first) : Promise.resolve({ items: first, complete: true }),
-              needNew ? service.loadNewFlags(query, first).catch(() => first) : Promise.resolve(first)
-            ])
-              .then(([views, withNew]) => {
-                if (cancelled) return;
-                mark('views+new');
-                const flags: Record<number, boolean | undefined> = {};
-                withNew.forEach((i) => {
-                  flags[i.id] = i.isNew;
+          // 3. ...then fresh view counts and "new" flags. Each fills in as soon as it arrives, so a slow
+          //    view-count source never holds up the NEW badges (or the other way round).
+          let latest: IRollupItem[] = first;
+          let viewsComplete = !result.viewsPending;
+          const apply = (update: (cur: IRollupItem[]) => IRollupItem[]): void => {
+            if (cancelled) return;
+            latest = update(latest);
+            setItems(latest);
+            service.storeResult(query, { ...result, items: latest, viewsPending: result.viewsPending && !viewsComplete });
+          };
+          const jobs: Promise<void>[] = [];
+          if (result.viewsPending && first.length > 0) {
+            jobs.push(
+              service.loadViews(query, first).then((views) => {
+                mark(`views (${views.source})`);
+                viewsComplete = views.complete;
+                const byId: Record<number, IRollupItem> = {};
+                views.items.forEach((i) => {
+                  byId[i.id] = i;
                 });
-                const merged = views.items.map((i) => ({ ...i, isNew: flags[i.id] }));
-                setItems(merged);
-                // If search failed, leave viewsPending set so the next load tries again
-                service.storeResult(query, { ...result, items: merged, viewsPending: result.viewsPending && !views.complete });
-                logTimings(timings, query, merged.length);
+                apply((cur) =>
+                  cur.map((i) => (byId[i.id] ? { ...i, viewsLifetime: byId[i.id].viewsLifetime, viewsRecent: byId[i.id].viewsRecent } : i))
+                );
               })
-              .catch(() => undefined);
-          } else {
-            logTimings(timings, query, first.length);
+            );
           }
+          if (query.newDays > 0 && first.length > 0) {
+            jobs.push(
+              service
+                .loadNewFlags(query, first)
+                .then((withNew) => {
+                  mark('new');
+                  const flags: Record<number, boolean | undefined> = {};
+                  withNew.forEach((i) => {
+                    flags[i.id] = i.isNew;
+                  });
+                  apply((cur) => cur.map((i) => ({ ...i, isNew: flags[i.id] })));
+                })
+                .catch(() => undefined)
+            );
+          }
+          Promise.all(jobs)
+            .then(() => logTimings(timings, query, latest.length))
+            .catch(() => undefined);
         })
         .catch((e: Error) => {
           if (!cancelled) {

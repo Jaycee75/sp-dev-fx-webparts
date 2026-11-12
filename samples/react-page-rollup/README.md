@@ -82,10 +82,19 @@ Notes:
 
 ### View counts
 
-View counts come from SharePoint search, which can be slow or briefly throttled.
-- **Kept for a day:** the web part keeps each item's last known count for up to a day and shows it instantly, so counts don't blink out when tiles refresh.
-- **Re-checked every 10 minutes at most:** search is only asked again when a count is older than that.
-- **If search fails:** the web part retries once with a simpler query (the whole library). If that fails too, it keeps the last known count and pauses search requests for 5 minutes.
+All-time view counts come from **item analytics** (`/_api/v2.1/…/analytics/allTime`): the same view statistics SharePoint shows for files and pages. It uses the viewer's normal sign-in, with no Graph permission or admin approval, and doesn't depend on search.
+- **One small request per item on screen**, six at a time, cached for 10 minutes.
+- **Unsupported tenants:** the web part finds out from the first request or two, then uses SharePoint search for the rest of the visit.
+- **"Last 14 days" counts** always come from search, because analytics only gives all-time totals here.
+
+When search is used:
+- Search has an **8-second time limit**.
+- A failure is retried once with a simpler query (the whole library).
+- After repeated failures, search requests are paused for 5 minutes.
+
+Last known counts are kept for up to a day and shown instantly, so they never blink out. View counts and NEW badges load independently, so a slow view source never delays the badges.
+
+Likes and comments don't use search at all. They come from the page's own columns.
 
 ### Diagnosing a slow page
 
@@ -111,7 +120,7 @@ The package is created at `sharepoint/solution/page-rollup.sppkg`. Upload it to 
 | --- | --- | --- |
 | 1.0.0 | November 2026 | Initial release |
 | 1.1.0 | November 2026 | Spotlight, card and slide-up carousels; sharper images; new mosaic pattern |
-| 1.10.0 | November 2026 | Use the simple view query straight away once it has worked; ?rollupdebug=1 also logs the web part version |
+| 1.10.0 | November 2026 | View counts from item analytics (no search, no admin consent) with automatic fallback to search; 8-second search time limit; views and NEW badges load independently; ?rollupdebug=1 logs the version and which view source was used |
 | 1.9.0 | November 2026 | Fix double-encoded picture preview paths (400 errors); view search falls back to a simpler query and pauses after repeated failures; preview handler skipped after repeated failures |
 | 1.8.0 | November 2026 | Reliable view counts (cached, retried, no blinking); no continuous animations (steady glow, 3-pulse badge); cheaper badges and spotlight dimming; ?rollupdebug=1 timings |
 | 1.7.0 | November 2026 | Highlight new items: NEW badge and optional glow for items within X days |

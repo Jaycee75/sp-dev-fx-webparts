@@ -57,6 +57,16 @@ function searchAvailable(): boolean {
 function pauseSearch(): void {
   searchBackoffUntil = Date.now() + SEARCH_BACKOFF;
 }
+/**
+ * Item analytics (/_api/v2.1/.../analytics/allTime) is tried first for all-time views: it's quick and doesn't
+ * depend on search. If the tenant doesn't support it, we find out on the first request and use search instead.
+ */
+let analyticsState: 'unknown' | 'ok' | 'unsupported' = 'unknown';
+function setAnalyticsState(state: 'ok' | 'unsupported'): void {
+  analyticsState = state;
+}
+const SEARCH_TIMEOUT = 8000;
+
 /** Some tenants' search rejects the item-by-item query (500); once the simple query has worked, use it first. */
 let preferSimpleViewQuery = false;
 function useSimpleViewQuery(): void {
@@ -314,23 +324,34 @@ export class RollupService {
    * Never throws: if search fails (it can be slow or throttled) it retries once, then keeps the last known counts.
    * `complete` is false when some counts could not be refreshed, so the caller can try again next time.
    */
-  public async loadViews(query: IRollupQuery, items: IRollupItem[]): Promise<{ items: IRollupItem[]; complete: boolean }> {
+  public async loadViews(
+    query: IRollupQuery,
+    items: IRollupItem[]
+  ): Promise<{ items: IRollupItem[]; complete: boolean; source: string }> {
     const web = this.resolveSiteUrl(query.siteUrl);
     const known = this._viewCache(query);
     const now = Date.now();
     const stale = items.filter((i) => !known[i.id] || now - known[i.id].at >= VIEWS_FRESH);
     let complete = true;
+    let source = 'cache';
 
     if (stale.length > 0) {
       const copy = stale.map((i) => ({ ...i, viewsLifetime: undefined, viewsRecent: undefined }));
       let ok = false;
-      if (searchAvailable()) {
+      // 1. Item analytics (all-time counts only)
+      if (query.viewsPeriod !== 'recent' && analyticsState !== 'unsupported') {
+        ok = await this._attachAnalytics(web, query.listId, copy);
+        if (ok) source = 'analytics';
+      }
+      // 2. SharePoint search
+      if (!ok && searchAvailable()) {
+        source = 'search';
         const startedSimple = preferSimpleViewQuery;
         ok = await this._attachViews(web, query.listId, copy, startedSimple);
         if (!ok) {
           // Search sometimes rejects the item-by-item query (500), or has a brief blip. Always retry once,
           // with the simplest possible query: every item in the library, matched up here.
-          await new Promise((resolve) => window.setTimeout(resolve, 1000));
+          await new Promise((resolve) => setTimeout(resolve, 1000));
           ok = await this._attachViews(web, query.listId, copy, true);
           if (ok && !startedSimple) useSimpleViewQuery();
         }
@@ -354,11 +375,61 @@ export class RollupService {
       const k = known[i.id];
       return k && now - k.at < VIEWS_KEEP ? { ...i, viewsLifetime: k.life, viewsRecent: k.recent } : { ...i };
     });
-    return { items: result, complete };
+    return { items: result, complete, source };
+  }
+
+  /** All-time view counts from item analytics. Returns false if the tenant doesn't support it. */
+  private async _attachAnalytics(web: string, listId: string, items: IRollupItem[]): Promise<boolean> {
+    const ids = await this._getWebIds(web);
+    if (!ids) return false;
+    const clean = (g: string): string => g.replace(/[{}]/g, '');
+    const base = `${web}/_api/v2.1/sites/${ids.host},${clean(ids.siteId)},${clean(ids.webId)}/lists/${clean(listId)}/items`;
+
+    // Returns the HTTP status (0 = network error/timeout) and, on success, the all-time view count
+    const fetchOne = async (item: IRollupItem): Promise<{ status: number; count?: number }> => {
+      try {
+        const res = await this._http.get(`${base}/${item.id}/analytics/allTime`, SPHttpClient.configurations.v1, {
+          headers: { Accept: 'application/json' }
+        });
+        if (!res.ok) return { status: res.status };
+        const data = await res.json();
+        return { status: 200, count: (data && data.access && Number(data.access.actionCount)) || 0 };
+      } catch {
+        return { status: 0 };
+      }
+    };
+    const apply = (item: IRollupItem, r: { status: number; count?: number }): void => {
+      if (r.status === 200) item.viewsLifetime = r.count;
+      // No analytics recorded for an item yet (once analytics is known to work): treat as 0 views
+      else if (r.status === 404 && analyticsState === 'ok') item.viewsLifetime = 0;
+    };
+
+    if (analyticsState === 'unknown') {
+      // Probe with up to two items: an unsupported tenant answers 400/401/403/404/501 straight away
+      const first = await fetchOne(items[0]);
+      const second = first.status === 200 || items.length < 2 ? first : await fetchOne(items[1]);
+      if (first.status !== 200 && second.status !== 200) {
+        if ([400, 401, 403, 404, 405, 501].indexOf(second.status) !== -1) setAnalyticsState('unsupported');
+        return false;
+      }
+      setAnalyticsState('ok');
+      apply(items[0], first);
+      if (items.length > 1 && second !== first) apply(items[1], second);
+    }
+
+    // The rest, six at a time
+    const todo = items.filter((i) => i.viewsLifetime === undefined);
+    for (let i = 0; i < todo.length; i += 6) {
+      const batch = todo.slice(i, i + 6);
+      const results = await Promise.all(batch.map(fetchOne));
+      results.forEach((r, n) => apply(batch[n], r));
+    }
+    return items.some((i) => i.viewsLifetime !== undefined);
   }
 
   private _viewKey(query: IRollupQuery): string {
-    return `views|${this.resolveSiteUrl(query.siteUrl)}|${query.listId}`;
+    // Kept per period: analytics only gives all-time counts
+    return `views|${this.resolveSiteUrl(query.siteUrl)}|${query.listId}|${query.viewsPeriod || 'lifetime'}`;
   }
 
   private _viewCache(query: IRollupQuery): Record<number, IViewEntry> {
@@ -592,7 +663,7 @@ export class RollupService {
       `&sourceid='8413cd39-2156-4e00-b54d-11efd9abdb89'`;
 
     try {
-      const data = await this._get(url);
+      const data = await this._get(url, SEARCH_TIMEOUT);
       const rows: any[] =
         (data.PrimaryQueryResult && data.PrimaryQueryResult.RelevantResults &&
           data.PrimaryQueryResult.RelevantResults.Table && data.PrimaryQueryResult.RelevantResults.Table.Rows) || [];
@@ -638,11 +709,19 @@ export class RollupService {
     return values.filter((v, i) => !!v && values.indexOf(v) === i);
   }
 
-  private async _get(url: string): Promise<any> {
-    const res = await this._http.get(url, SPHttpClient.configurations.v1, {
-      headers: { Accept: 'application/json;odata=nometadata', 'odata-version': '' }
-    });
-    return this._json(res);
+  private async _get(url: string, timeoutMs?: number): Promise<any> {
+    // Optional time limit (used for search, which can take 15+ seconds on a bad day)
+    const controller = timeoutMs && typeof AbortController !== 'undefined' ? new AbortController() : undefined;
+    const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : undefined;
+    try {
+      const res = await this._http.get(url, SPHttpClient.configurations.v1, {
+        headers: { Accept: 'application/json;odata=nometadata', 'odata-version': '' },
+        signal: controller ? controller.signal : undefined
+      });
+      return await this._json(res);
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
   }
 
   private async _post(url: string, body: any): Promise<any> {
