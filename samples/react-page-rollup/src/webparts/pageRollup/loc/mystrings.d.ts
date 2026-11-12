@@ -144,6 +144,10 @@ declare interface IPageRollupWebPartStrings {
   AlignLeft: string;
   AlignCenter: string;
   AlignRight: string;
+  ShowLikesLabel: string;
+  ShowCommentsLabel: string;
+  SortLikes: string;
+  SocialHelp: string;
 }
 
 declare module 'PageRollupWebPartStrings' {

@@ -804,3 +804,38 @@
 .hoverZoom .tile:focus-visible .docPlaceholder {
   transform: scale(1.06);
 }
+
+// ----- Stats badge (views / likes / comments) --------------------------------------
+
+.stat {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+
+  & + .stat {
+    margin-left: 6px;
+    padding-left: 8px;
+    border-left: 1px solid rgba(255, 255, 255, 0.3);
+  }
+}
+
+.inlineStats {
+  order: 10; // after the title and columns
+  display: flex;
+  gap: 14px;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--pr-subtle);
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+}

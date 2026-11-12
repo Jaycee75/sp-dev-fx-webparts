@@ -7,7 +7,7 @@ export type TitleAlign = 'left' | 'center' | 'right';
 export type HoverEffect = 'zoom' | 'lift' | 'reveal' | 'none';
 export type OverlayStyle = 'gradient' | 'glass' | 'solid';
 export type DateRange = 'all' | 'lastDays' | 'thisQuarter' | 'lastQuarter' | 'thisYear';
-export type SortBy = 'dateDesc' | 'dateAsc' | 'title' | 'views';
+export type SortBy = 'dateDesc' | 'dateAsc' | 'title' | 'views' | 'likes';
 export type FilterOperator = 'eq' | 'neq' | 'contains' | 'empty' | 'notEmpty';
 export type SizeMode = 'auto' | 'fixed';
 export type AspectRatio = '16:9' | '4:3' | '1:1' | '3:4';
@@ -59,6 +59,8 @@ export interface IPageRollupWebPartProps {
   thumbnailField: string;
   showViews: boolean;
   viewsPeriod: ViewsPeriod;
+  showLikes: boolean;
+  showComments: boolean;
   openInNewTab: boolean;
   imageQuality: ImageQuality;
   imageFit: ImageFit;
@@ -115,6 +117,7 @@ export interface IRollupQuery {
   displayFields: string[];
   thumbnailField: string;
   includeViews: boolean;
+  includeSocial: boolean;
   viewsPeriod: ViewsPeriod;
   detailsField: string;
 }
@@ -150,6 +153,9 @@ export interface IRollupItem {
   values: Record<string, string>;
   /** Full text of the details column, line breaks kept (shown on hover). */
   details?: string;
+  /** Likes and comments: from the page's _LikeCount/_CommentCount, or a library's ratings 'LikesCount' column. Undefined when the library doesn't track them. */
+  likes?: number;
+  comments?: number;
   viewsLifetime?: number;
   viewsRecent?: number;
 }

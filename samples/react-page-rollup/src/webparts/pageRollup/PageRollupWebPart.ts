@@ -63,6 +63,8 @@ const DEFAULTS: Partial<IPageRollupWebPartProps> = {
   thumbnailField: '',
   showViews: true,
   viewsPeriod: 'lifetime',
+  showLikes: true,
+  showComments: false,
   openInNewTab: false,
   imageQuality: 'sharp',
   imageFit: 'cover',
@@ -168,6 +170,7 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
       displayFields: overlayFields,
       thumbnailField: p.thumbnailField,
       includeViews: p.showViews,
+      includeSocial: p.showLikes || p.showComments,
       viewsPeriod: p.viewsPeriod,
       detailsField: p.hoverEffect === 'reveal' ? p.detailsField : ''
     };
@@ -181,6 +184,8 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
       showFieldLabels: p.showFieldLabels,
       showViews: p.showViews,
       viewsPeriod: p.viewsPeriod,
+      showLikes: p.showLikes,
+      showComments: p.showComments,
       openInNewTab: p.openInNewTab,
       imageQuality: p.imageQuality,
       imageFit: p.imageFit,
@@ -501,7 +506,8 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
           { key: 'dateDesc', text: strings.SortNewest },
           { key: 'dateAsc', text: strings.SortOldest },
           { key: 'title', text: strings.SortTitle },
-          { key: 'views', text: strings.SortViews }
+          { key: 'views', text: strings.SortViews },
+          { key: 'likes', text: strings.SortLikes }
         ]
       }),
       PropertyPaneSlider('maxItems', { label: strings.MaxItemsLabel, min: 1, max: 50, step: 1, showValue: true })
@@ -600,6 +606,13 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
           ]
         })
       );
+    }
+    displayFields.push(
+      PropertyPaneToggle('showLikes', { label: strings.ShowLikesLabel, onText: strings.On, offText: strings.Off }),
+      PropertyPaneToggle('showComments', { label: strings.ShowCommentsLabel, onText: strings.On, offText: strings.Off })
+    );
+    if (p.showLikes || p.showComments) {
+      displayFields.push(PropertyPaneLabel('socialHelp', { text: strings.SocialHelp }));
     }
     displayFields.push(PropertyPaneToggle('openInNewTab', { label: strings.NewTabLabel, onText: strings.On, offText: strings.Off }));
 

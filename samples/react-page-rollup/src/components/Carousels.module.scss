@@ -213,6 +213,8 @@
 .socialStats {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
+  row-gap: 2px;
   gap: 6px;
   font-size: 13px;
   color: var(--pr-text);
@@ -436,4 +438,12 @@
     width: 16px;
     height: 16px;
   }
+}
+
+.socialStat {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 14px;
+  white-space: nowrap;
 }

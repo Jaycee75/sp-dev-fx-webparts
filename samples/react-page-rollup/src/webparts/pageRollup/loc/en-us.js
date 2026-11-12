@@ -72,7 +72,7 @@ define([], function() {
     "OverlayField1Label": "Column 1 (heading)",
     "OverlayFieldLabel": "Column",
     "ShowFieldLabels": "Show column names next to values",
-    "ShowViewsLabel": "Show page views in the corner",
+    "ShowViewsLabel": "Show page views",
     "ViewsPeriodLabel": "Views to show",
     "ViewsLifetime": "All time",
     "ViewsRecent": "Last 14 days",
@@ -144,6 +144,10 @@ define([], function() {
     "TitleAlignLabel": "Heading alignment",
     "AlignLeft": "Left",
     "AlignCenter": "Centre",
-    "AlignRight": "Right"
+    "AlignRight": "Right",
+    "ShowLikesLabel": "Show likes",
+    "ShowCommentsLabel": "Show comments",
+    "SortLikes": "Most liked",
+    "SocialHelp": "Likes and comments are shown for site pages. For a document library, turn on Library settings > Rating settings > Likes to give it a likes count. Counts appear in the corner of each tile (and under the picture on the card carousel)."
   };
 });

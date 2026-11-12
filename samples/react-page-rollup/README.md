@@ -12,7 +12,11 @@ A SharePoint Framework web part that rolls up pages (or documents) from a site a
 - **Sort** by newest, oldest, title or most viewed, with a **maximum number of items** from 1 to 50.
 - **Pages-only options**: show only published pages, and only news posts.
 - **Text on tiles** can be turned on or off. Pick up to 5 columns; the first one is the heading. You can also show the column names.
-- **Page views** badge in the corner (all time or last 14 days), which can be turned on or off.
+- **Views, likes and comments**: each can be turned on or off. They're shown together in a badge in the corner of each tile, under the picture on the Card carousel, and as a line of text in the List layout.
+  - Views come from SharePoint search (all time or last 14 days).
+  - Likes and comments come from the page's own like/comment counts.
+  - For document libraries, turn on *Library settings > Rating settings > Likes* to give them a likes count.
+  - You can also sort by *Most liked*.
 - **Nine layouts**:
   - **Tiles**: equal tiles with text over the picture.
   - **Cards**: picture on top, text underneath.
@@ -54,6 +58,7 @@ Point the web part at any document library, or add **Document Rollup** from the 
 | --- | --- | --- |
 | Items, columns, libraries | SharePoint REST (`RenderListDataAsStream`, `lists`, `fields`) | The viewer's own SharePoint permissions |
 | Page views | SharePoint Search (`ViewsLifeTime`, `ViewsRecent`) | The viewer's own SharePoint permissions |
+| Likes, comments | Library columns `_LikeCount`, `_CommentCount` (pages) or `LikesCount` (libraries with ratings set to Likes) | The viewer's own SharePoint permissions |
 
 There are **no Microsoft Graph permission requests**, so the package can be deployed to a site collection app catalog without a SharePoint admin.
 
@@ -83,6 +88,7 @@ The package is created at `sharepoint/solution/page-rollup.sppkg`. Upload it to 
 | --- | --- | --- |
 | 1.0.0 | November 2026 | Initial release |
 | 1.1.0 | November 2026 | Spotlight, card and slide-up carousels; sharper images; new mosaic pattern |
+| 1.5.0 | November 2026 | Likes and comments counts (with Most liked sort) alongside views |
 | 1.4.0 | November 2026 | Inline-editable heading with size and alignment toolbar |
 | 1.3.0 | November 2026 | Document previews (thumbnail API with fallbacks), file-type placeholders, picture fit option, Document Rollup toolbox entry |
 | 1.2.0 | November 2026 | Hover details column (full text) in all layouts; picture background for Spotlight; card carousel arrows moved beside the dots |

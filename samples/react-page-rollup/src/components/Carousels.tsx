@@ -1,7 +1,7 @@
 import * as React from 'react';
 import styles from './Carousels.module.scss';
 import { CarouselBackground, ImageQuality, IRollupItem } from '../models/IPageRollupProps';
-import { DetailsPanel, detailsHostClass, EyeIcon, hashHue, hasDetails, IRollupDisplay, pickImageSources, RollupTile, TileImage } from './RollupTile';
+import { DetailsPanel, detailsHostClass, getStats, hashHue, StatIcon, hasDetails, IRollupDisplay, pickImageSources, RollupTile, TileImage } from './RollupTile';
 import { formatCount } from '../utils/fieldValues';
 
 export interface ICarouselOptions {
@@ -355,7 +355,7 @@ const SocialCard: React.FC<{ item: IRollupItem; display: IRollupDisplay; width: 
   const who = meta[0] || '';
   const when = meta[1] || '';
   const rest = meta.slice(2);
-  const views = display.viewsPeriod === 'recent' ? item.viewsRecent : item.viewsLifetime;
+  const stats = getStats(item, display);
   const hue = hashHue(who || heading);
   const showDetails = hasDetails(item, display);
   const hoverClass =
@@ -394,12 +394,16 @@ const SocialCard: React.FC<{ item: IRollupItem; display: IRollupDisplay; width: 
         {showDetails && <DetailsPanel heading={heading} text={item.details || ''} compact={mediaH < 200} />}
       </div>
       <div className={styles.socialFoot}>
-        {display.showViews && typeof views === 'number' && (
+        {stats.length > 0 && (
           <div className={styles.socialStats}>
-            <EyeIcon />
-            <span>
-              <b>{formatCount(views)}</b> views
-            </span>
+            {stats.map((st) => (
+              <span key={st.key} className={styles.socialStat}>
+                <StatIcon kind={st.key} />
+                <span>
+                  <b>{formatCount(st.value)}</b> {st.label}
+                </span>
+              </span>
+            ))}
           </div>
         )}
         {display.showOverlay && (
@@ -418,7 +422,7 @@ export const SocialCarousel: React.FC<ICarouselBaseProps & { visible: number }> 
   const shown = Math.max(1, Math.min(visible, n));
   const cardW = (width - gap * (shown - 1)) / shown;
   const headH = 56;
-  const footH = (display.showViews ? 30 : 0) + (display.showOverlay ? 52 : 0) + 16;
+  const footH = (display.showViews || display.showLikes || display.showComments ? 30 : 0) + (display.showOverlay ? 52 : 0) + 16;
   const dotsH = (options.dots || options.arrows) && n > shown ? 44 : 0;
   const cardH = fixedHeight ? Math.max(180, fixedHeight - dotsH - 8) : Math.round(headH + cardW * ratio + footH);
   const mediaH = Math.max(60, cardH - headH - footH);

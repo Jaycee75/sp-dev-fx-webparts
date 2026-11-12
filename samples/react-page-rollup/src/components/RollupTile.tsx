@@ -13,6 +13,8 @@ export interface IRollupDisplay {
   showFieldLabels: boolean;
   showViews: boolean;
   viewsPeriod: ViewsPeriod;
+  showLikes: boolean;
+  showComments: boolean;
   openInNewTab: boolean;
   imageQuality: ImageQuality;
   imageFit: ImageFit;
@@ -54,12 +56,44 @@ export interface IRollupTileProps {
   style?: React.CSSProperties;
 }
 
+export const HeartIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21l7.8-7.5 1-1.1a5.5 5.5 0 0 0 0-7.8z" />
+  </svg>
+);
+
+export const CommentIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M21 11.5a8.4 8.4 0 0 1-8.5 8.5 8.6 8.6 0 0 1-3.8-.9L3 21l1.9-5.6a8.4 8.4 0 0 1-.9-3.9A8.5 8.5 0 0 1 12.5 3 8.4 8.4 0 0 1 21 11.5z" />
+  </svg>
+);
+
+export interface IStat {
+  key: 'views' | 'likes' | 'comments';
+  value: number;
+  label: string;
+}
+
+/** The counts switched on in the settings that this item actually has. */
+export function getStats(item: IRollupItem, display: IRollupDisplay): IStat[] {
+  const stats: IStat[] = [];
+  const views = display.viewsPeriod === 'recent' ? item.viewsRecent : item.viewsLifetime;
+  if (display.showViews && typeof views === 'number') stats.push({ key: 'views', value: views, label: views === 1 ? 'view' : 'views' });
+  if (display.showLikes && typeof item.likes === 'number') stats.push({ key: 'likes', value: item.likes, label: item.likes === 1 ? 'like' : 'likes' });
+  if (display.showComments && typeof item.comments === 'number')
+    stats.push({ key: 'comments', value: item.comments, label: item.comments === 1 ? 'comment' : 'comments' });
+  return stats;
+}
+
 export const EyeIcon: React.FC = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
     <circle cx="12" cy="12" r="3" />
   </svg>
 );
+
+export const StatIcon: React.FC<{ kind: IStat['key'] }> = ({ kind }) =>
+  kind === 'likes' ? <HeartIcon /> : kind === 'comments' ? <CommentIcon /> : <EyeIcon />;
 
 export function hashHue(text: string): number {
   let h = 0;
@@ -182,8 +216,10 @@ export const TileImage: React.FC<{ item: IRollupItem; quality: ImageQuality; wid
 };
 
 export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, mediaRatio, large, imgWidth, allowDetails = true, style }) => {
-  const { layout, showOverlay, overlayStyle, overlayFields, fieldTitles, showFieldLabels, showViews, viewsPeriod } = display;
-  const views = viewsPeriod === 'recent' ? item.viewsRecent : item.viewsLifetime;
+  const { layout, showOverlay, overlayStyle, overlayFields, fieldTitles, showFieldLabels } = display;
+  const stats = getStats(item, display);
+  // List rows have small thumbnails, so their counts go in the text instead of a badge on the picture
+  const statsInline = layout === 'list' && display.showOverlay && stats.length > 0;
   const isCard = layout === 'cards';
   const isList = layout === 'list';
   const textBelow = isCard || isList;
@@ -205,6 +241,16 @@ export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, 
       }
     >
       {heading && <p className={`${styles.title} ${large ? styles.titleLarge : ''}`}>{heading}</p>}
+      {statsInline && (
+        <div className={styles.inlineStats} aria-label={stats.map((st) => `${st.value} ${st.label}`).join(', ')}>
+          {stats.map((st) => (
+            <span key={st.key}>
+              <StatIcon kind={st.key} />
+              {formatCount(st.value)}
+            </span>
+          ))}
+        </div>
+      )}
       {meta.length > 0 && (
         <div className={styles.metaWrap}>
           {meta.map((m) => (
@@ -244,10 +290,14 @@ export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, 
       <div className={`${styles.media} ${textBelow ? '' : styles.mediaFill}`} style={mediaStyle}>
         <TileImage item={item} quality={display.imageQuality} fit={display.imageFit} width={isList ? Math.min(220, (imgWidth || 300) * 0.3) : imgWidth} />
       </div>
-      {showViews && typeof views === 'number' && (
-        <span className={styles.views} aria-label={`${views} views`}>
-          <EyeIcon />
-          {formatCount(views)}
+      {stats.length > 0 && !statsInline && (
+        <span className={styles.views} aria-label={stats.map((st) => `${st.value} ${st.label}`).join(', ')}>
+          {stats.map((st) => (
+            <span key={st.key} className={styles.stat}>
+              <StatIcon kind={st.key} />
+              {formatCount(st.value)}
+            </span>
+          ))}
         </span>
       )}
       {text}

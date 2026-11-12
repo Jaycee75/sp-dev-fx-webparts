@@ -9,7 +9,10 @@ import { getFieldText, getFieldTextMultiline, rowMatches } from '../utils/fieldV
 export const SITE_PAGES_TEMPLATE = 119;
 
 /** Columns that are hidden but still useful on Site Pages libraries. */
-const USEFUL_HIDDEN_FIELDS = ['FirstPublishedDate', 'Description', 'BannerImageUrl', 'PromotedState', 'FileLeafRef', 'Modified', 'Created'];
+const USEFUL_HIDDEN_FIELDS = ['FirstPublishedDate', 'Description', 'BannerImageUrl', 'PromotedState', 'FileLeafRef', 'Modified', 'Created', '_LikeCount', '_CommentCount', 'LikesCount'];
+/** Like and comment count columns: pages use _LikeCount/_CommentCount; libraries with ratings set to Likes use LikesCount. */
+const LIKE_FIELDS = ['_LikeCount', 'LikesCount'];
+const COMMENT_FIELDS = ['_CommentCount'];
 
 const SUPPORTED_FIELD_TYPES = [
   'Text', 'Note', 'Choice', 'MultiChoice', 'Boolean', 'Number', 'Currency', 'Integer', 'Counter', 'DateTime',
@@ -76,7 +79,7 @@ export class RollupService {
     const fields: IRollupField[] = (data.value || [])
       .filter((f: any) => SUPPORTED_FIELD_TYPES.indexOf(f.TypeAsString) !== -1)
       .filter((f: any) => !f.Hidden || USEFUL_HIDDEN_FIELDS.indexOf(f.InternalName) !== -1)
-      .filter((f: any) => f.InternalName.indexOf('_') !== 0 && f.InternalName !== 'ContentType')
+      .filter((f: any) => (f.InternalName.indexOf('_') !== 0 || USEFUL_HIDDEN_FIELDS.indexOf(f.InternalName) !== -1) && f.InternalName !== 'ContentType')
       .filter((f: any) => (seen[f.InternalName] ? false : (seen[f.InternalName] = true)))
       .map((f: any) => ({ internalName: f.InternalName, title: f.Title, type: f.TypeAsString }))
       .sort((a: IRollupField, b: IRollupField) => a.title.localeCompare(b.title));
@@ -94,7 +97,11 @@ export class RollupService {
     const dateField = has(query.dateField) ? query.dateField : 'Created';
     const clientFilters = query.filters.filter((f) => f.field && has(f.field));
     const needsClientFiltering = clientFilters.length > 0 || query.isPagesLibrary;
-    const sortByViews = query.sortBy === 'views';
+    const sortByLikes = query.sortBy === 'likes';
+    // Both need every candidate before sorting, so they scan instead of stopping at the limit
+    const sortByViews = query.sortBy === 'views' || sortByLikes;
+    const likeField = LIKE_FIELDS.filter(has)[0] || '';
+    const commentField = COMMENT_FIELDS.filter(has)[0] || '';
 
     const viewFields = this._unique([
       ...ALWAYS_SELECT,
@@ -103,7 +110,8 @@ export class RollupService {
       ...(query.thumbnailField ? [query.thumbnailField] : []),
       ...query.displayFields,
       ...(query.detailsField ? [query.detailsField] : []),
-      ...clientFilters.map((f) => f.field)
+      ...clientFilters.map((f) => f.field),
+      ...(query.includeSocial || sortByLikes ? [likeField, commentField] : [])
     ]).filter((f) => ALWAYS_SELECT.indexOf(f) !== -1 || has(f));
 
     const viewXml = this._buildViewXml(query, dateField, viewFields, has, needsClientFiltering || sortByViews ? 100 : query.maxItems);
@@ -130,7 +138,12 @@ export class RollupService {
         if (!rowMatches(row, clientFilters, query.filterMatch)) {
           continue;
         }
-        matched.push(this._toItem(row, web, origin, query, viewFields, ids));
+        const item = this._toItem(row, web, origin, query, viewFields, ids);
+        if (query.includeSocial || sortByLikes) {
+          if (likeField) item.likes = Number(row[likeField]) || 0;
+          if (commentField) item.comments = Number(row[commentField]) || 0;
+        }
+        matched.push(item);
         if (!sortByViews && matched.length >= target) {
           break;
         }
@@ -147,9 +160,13 @@ export class RollupService {
     }
 
     let items = matched;
-    if (query.includeViews || sortByViews) {
-      await this._attachViews(web, query.listId, items, sortByViews);
-      if (sortByViews) {
+    if (sortByLikes) {
+      // Trim before looking up views so the search query only names the items shown
+      items = items.slice().sort((a, b) => (b.likes || 0) - (a.likes || 0)).slice(0, target);
+    }
+    if (query.includeViews || (sortByViews && !sortByLikes)) {
+      await this._attachViews(web, query.listId, items, sortByViews && !sortByLikes);
+      if (sortByViews && !sortByLikes) {
         const pick = (i: IRollupItem): number => (query.viewsPeriod === 'recent' ? i.viewsRecent : i.viewsLifetime) || 0;
         items = items.slice().sort((a, b) => pick(b) - pick(a));
       }
