@@ -3,7 +3,7 @@
   "solution": {
     "name": "new-like-web-part-client-side-solution",
     "id": "dbf2ef83-5b94-45ea-890e-4f7e57dadbc8",
-    "version": "1.0.0.0",
+    "version": "1.1.0.0",
     "includeClientSideAssets": true,
     "skipFeatureDeployment": true,
     "isDomainIsolated": false,
@@ -30,7 +30,7 @@
         "title": "new-like-web-part Feature",
         "description": "The feature that activates the Like web part.",
         "id": "2b3412d2-6d55-45ad-bfd1-6254bb1c8e8c",
-        "version": "1.0.0.0"
+        "version": "1.1.0.0"
       }
     ]
   },
