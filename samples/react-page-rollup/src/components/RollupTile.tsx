@@ -1,6 +1,6 @@
 import * as React from 'react';
 import styles from './PageRollup.module.scss';
-import { IRollupItem, OverlayStyle, RollupLayout, ViewsPeriod } from '../models/IPageRollupProps';
+import { ImageQuality, IRollupItem, OverlayStyle, RollupLayout, ViewsPeriod } from '../models/IPageRollupProps';
 import { formatCount } from '../utils/fieldValues';
 
 export interface IRollupDisplay {
@@ -14,6 +14,7 @@ export interface IRollupDisplay {
   showViews: boolean;
   viewsPeriod: ViewsPeriod;
   openInNewTab: boolean;
+  imageQuality: ImageQuality;
 }
 
 export interface IRollupTileProps {
@@ -24,17 +25,19 @@ export interface IRollupTileProps {
   /** Media height as a % of width (padding-top trick) for auto-height cards. */
   mediaRatio?: number;
   large?: boolean;
+  /** Width the picture is drawn at, in CSS pixels; used to request a sharp enough image. */
+  imgWidth?: number;
   style?: React.CSSProperties;
 }
 
-const EyeIcon: React.FC = () => (
+export const EyeIcon: React.FC = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
     <circle cx="12" cy="12" r="3" />
   </svg>
 );
 
-function hashHue(text: string): number {
+export function hashHue(text: string): number {
   let h = 0;
   for (let i = 0; i < text.length; i++) {
     h = (h * 31 + text.charCodeAt(i)) % 360;
@@ -42,7 +45,7 @@ function hashHue(text: string): number {
   return h;
 }
 
-const Placeholder: React.FC<{ item: IRollupItem }> = ({ item }) => {
+export const Placeholder: React.FC<{ item: IRollupItem }> = ({ item }) => {
   const hue = hashHue(item.title || String(item.id));
   const initials = (item.title || '?')
     .split(/\s+/)
@@ -62,19 +65,39 @@ const Placeholder: React.FC<{ item: IRollupItem }> = ({ item }) => {
   );
 };
 
-const TileImage: React.FC<{ item: IRollupItem }> = ({ item }) => {
-  // Try the resized preview first, then the original image, then a coloured placeholder.
-  const sources = [item.imageUrl, item.fallbackImageUrl].filter((s, i, a) => !!s && a.indexOf(s) === i);
+/** SharePoint preview handler sizes (approximate longest edge in px) for its resolution parameter. */
+const PREVIEW_SIZES = [300, 480, 750, 1024, 1600, 2560];
+
+/**
+ * Picture sources in the order to try them. "sharp" prefers the full-size image (the browser scales it down);
+ * "fast" prefers a SharePoint-resized copy that is just big enough for the tile.
+ */
+export function pickImageSources(item: IRollupItem, quality: ImageQuality, cssWidth: number): string[] {
+  const dpr = typeof window !== 'undefined' && window.devicePixelRatio ? Math.min(window.devicePixelRatio, 2) : 1;
+  const px = Math.max(200, Math.round((cssWidth || 400) * dpr));
+  let res = PREVIEW_SIZES.findIndex((size) => size >= px);
+  if (res === -1) res = PREVIEW_SIZES.length - 1;
+  const preview = item.previewBase ? `${item.previewBase}&resolution=${res}` : '';
+  const thumb = item.thumbTemplate ? item.thumbTemplate.replace('{W}', String(Math.ceil(px / 100) * 100)) : '';
+
+  const order = quality === 'fast' ? [thumb, preview, item.originalImage] : [item.originalImage, thumb, preview];
+  return order.filter((s, i, a) => !!s && a.indexOf(s) === i);
+}
+
+export const TileImage: React.FC<{ item: IRollupItem; quality: ImageQuality; width?: number }> = ({ item, quality, width }) => {
+  // Bucket the width so resizing the page doesn't keep swapping images
+  const bucket = Math.ceil((width || 400) / 200) * 200;
+  const sources = React.useMemo(() => pickImageSources(item, quality, bucket), [item, quality, bucket]);
   const [index, setIndex] = React.useState(0);
-  React.useEffect(() => setIndex(0), [item.imageUrl, item.fallbackImageUrl]);
+  React.useEffect(() => setIndex(0), [sources.join('|')]);
 
   if (index >= sources.length) {
     return <Placeholder item={item} />;
   }
-  return <img src={sources[index]} alt="" loading="lazy" decoding="async" onError={() => setIndex(index + 1)} />;
+  return <img src={sources[index]} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setIndex(index + 1)} />;
 };
 
-export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, mediaRatio, large, style }) => {
+export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, mediaRatio, large, imgWidth, style }) => {
   const { layout, showOverlay, overlayStyle, overlayFields, fieldTitles, showFieldLabels, showViews, viewsPeriod } = display;
   const views = viewsPeriod === 'recent' ? item.viewsRecent : item.viewsLifetime;
   const isCard = layout === 'cards';
@@ -134,7 +157,7 @@ export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, 
       style={{ ...(height ? { height } : {}), ...(textBelow ? {} : { minHeight: height || 120 }), ...style }}
     >
       <div className={`${styles.media} ${textBelow ? '' : styles.mediaFill}`} style={mediaStyle}>
-        <TileImage item={item} />
+        <TileImage item={item} quality={display.imageQuality} width={isList ? Math.min(220, (imgWidth || 300) * 0.3) : imgWidth} />
       </div>
       {showViews && typeof views === 'number' && (
         <span className={styles.views} aria-label={`${views} views`}>

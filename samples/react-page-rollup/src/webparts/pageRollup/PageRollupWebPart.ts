@@ -61,6 +61,19 @@ const DEFAULTS: Partial<IPageRollupWebPartProps> = {
   showViews: true,
   viewsPeriod: 'lifetime',
   openInNewTab: false,
+  imageQuality: 'sharp',
+  carouselAutoplay: true,
+  carouselInterval: 5,
+  carouselSpeed: 700,
+  carouselPauseOnHover: true,
+  carouselLoop: true,
+  carouselArrows: true,
+  carouselDots: true,
+  carouselSlideWidth: 60,
+  carouselBackground: 'blur',
+  carouselBgColor: '#1b1f3b',
+  carouselBgColor2: '#5b2a86',
+  tickerRows: 3,
   sizeMode: 'auto',
   fixedHeight: 480,
   columns: 0,
@@ -159,7 +172,8 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
       showFieldLabels: p.showFieldLabels,
       showViews: p.showViews,
       viewsPeriod: p.viewsPeriod,
-      openInNewTab: p.openInNewTab
+      openInNewTab: p.openInNewTab,
+      imageQuality: p.imageQuality
     };
 
     const element: React.ReactElement<IPageRollupProps> = React.createElement(PageRollup, {
@@ -176,6 +190,20 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
         cornerRadius: p.cornerRadius
       },
       hoverEffect: p.hoverEffect,
+      carousel: {
+        autoplay: p.carouselAutoplay,
+        interval: p.carouselInterval,
+        speed: p.carouselSpeed,
+        pauseOnHover: p.carouselPauseOnHover,
+        loop: p.carouselLoop,
+        arrows: p.carouselArrows,
+        dots: p.carouselDots,
+        slideWidth: p.carouselSlideWidth,
+        background: p.carouselBackground,
+        bgColor: p.carouselBgColor,
+        bgColor2: p.carouselBgColor2,
+        tickerRows: p.tickerRows
+      },
       title: p.title,
       dateLabel: describeDateWindow(p.dateRange, p.lastDays),
       isConfigured: !!p.listId,
@@ -433,10 +461,14 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
           { key: 'cards', text: strings.LayoutCards, iconProps: { officeFabricIconFontName: 'GridViewMedium' } },
           { key: 'hero', text: strings.LayoutHero, iconProps: { officeFabricIconFontName: 'ViewDashboard' } },
           { key: 'mosaic', text: strings.LayoutMosaic, iconProps: { officeFabricIconFontName: 'GridViewLarge' } },
-          { key: 'filmstrip', text: strings.LayoutFilmstrip, iconProps: { officeFabricIconFontName: 'Slideshow' } },
-          { key: 'list', text: strings.LayoutList, iconProps: { officeFabricIconFontName: 'ViewList' } }
+          { key: 'filmstrip', text: strings.LayoutFilmstrip, iconProps: { officeFabricIconFontName: 'TripleColumn' } },
+          { key: 'list', text: strings.LayoutList, iconProps: { officeFabricIconFontName: 'ViewList' } },
+          { key: 'spotlight', text: strings.LayoutSpotlight, iconProps: { officeFabricIconFontName: 'Slideshow' } },
+          { key: 'social', text: strings.LayoutSocial, iconProps: { officeFabricIconFontName: 'PhotoCollection' } },
+          { key: 'ticker', text: strings.LayoutTicker, iconProps: { officeFabricIconFontName: 'SortUp' } }
         ]
       }),
+      PropertyPaneLabel('layoutHelp', { text: (strings as unknown as Record<string, string>)[`LayoutHelp_${p.layout}`] || '' }),
       PropertyPaneDropdown('hoverEffect', {
         label: strings.HoverLabel,
         options: [
@@ -449,6 +481,13 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
       PropertyPaneDropdown('thumbnailField', {
         label: strings.ThumbnailLabel,
         options: this._fieldOptions((f) => f.type === 'Thumbnail' || f.type === 'URL', strings.ThumbnailAuto)
+      }),
+      PropertyPaneDropdown('imageQuality', {
+        label: strings.ImageQualityLabel,
+        options: [
+          { key: 'sharp', text: strings.ImageSharp },
+          { key: 'fast', text: strings.ImageFast }
+        ]
       }),
       PropertyPaneHorizontalRule(),
       PropertyPaneToggle('showOverlay', { label: strings.ShowOverlayLabel, onText: strings.On, offText: strings.Off })
@@ -491,6 +530,59 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
       );
     }
     displayFields.push(PropertyPaneToggle('openInNewTab', { label: strings.NewTabLabel, onText: strings.On, offText: strings.Off }));
+
+    const isCarousel = p.layout === 'spotlight' || p.layout === 'social' || p.layout === 'ticker';
+    const carouselFields: IPropertyPaneField<unknown>[] = [
+      PropertyPaneToggle('carouselAutoplay', { label: strings.AutoplayLabel, onText: strings.On, offText: strings.Off })
+    ];
+    if (p.carouselAutoplay) {
+      carouselFields.push(
+        PropertyPaneSlider('carouselInterval', { label: strings.IntervalLabel, min: 2, max: 20, step: 1, showValue: true }),
+        PropertyPaneToggle('carouselPauseOnHover', { label: strings.PauseLabel, onText: strings.On, offText: strings.Off })
+      );
+    }
+    carouselFields.push(
+      PropertyPaneSlider('carouselSpeed', { label: strings.SpeedLabel, min: 200, max: 2000, step: 50, showValue: true }),
+      PropertyPaneToggle('carouselLoop', { label: strings.LoopLabel, onText: strings.On, offText: strings.Off }),
+      PropertyPaneToggle('carouselArrows', { label: strings.ArrowsLabel, onText: strings.On, offText: strings.Off })
+    );
+    if (p.layout !== 'ticker') {
+      carouselFields.push(PropertyPaneToggle('carouselDots', { label: strings.DotsLabel, onText: strings.On, offText: strings.Off }));
+    }
+    if (p.layout === 'ticker') {
+      carouselFields.push(PropertyPaneSlider('tickerRows', { label: strings.TickerRowsLabel, min: 1, max: 6, step: 1, showValue: true }));
+    }
+    if (p.layout === 'spotlight') {
+      carouselFields.push(
+        PropertyPaneSlider('carouselSlideWidth', { label: strings.SlideWidthLabel, min: 35, max: 90, step: 5, showValue: true }),
+        PropertyPaneDropdown('carouselBackground', {
+          label: strings.BackgroundLabel,
+          options: [
+            { key: 'blur', text: strings.BgBlur },
+            { key: 'gradient', text: strings.BgGradient },
+            { key: 'color', text: strings.BgColor },
+            { key: 'theme', text: strings.BgTheme },
+            { key: 'none', text: strings.BgNone }
+          ]
+        })
+      );
+      const colourCheck = (v: string): string => (!v || /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.test(v.trim()) ? '' : strings.ColourError);
+      if (p.carouselBackground === 'color' || p.carouselBackground === 'gradient') {
+        carouselFields.push(
+          PropertyPaneTextField('carouselBgColor', {
+            label: p.carouselBackground === 'gradient' ? strings.BgColourFrom : strings.BgColourLabel,
+            placeholder: '#1b1f3b',
+            onGetErrorMessage: colourCheck,
+            deferredValidationTime: 400
+          })
+        );
+      }
+      if (p.carouselBackground === 'gradient') {
+        carouselFields.push(
+          PropertyPaneTextField('carouselBgColor2', { label: strings.BgColourTo, placeholder: '#5b2a86', onGetErrorMessage: colourCheck, deferredValidationTime: 400 })
+        );
+      }
+    }
 
     const sizeFields: IPropertyPaneField<unknown>[] = [
       PropertyPaneChoiceGroup('sizeMode', {
@@ -538,7 +630,10 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
         },
         {
           header: { description: strings.PageDisplay },
-          groups: [{ groupName: strings.GroupDisplay, groupFields: displayFields }]
+          groups: [
+            { groupName: strings.GroupDisplay, groupFields: displayFields },
+            ...(isCarousel ? [{ groupName: strings.GroupCarousel, groupFields: carouselFields }] : [])
+          ]
         },
         {
           header: { description: strings.PageSize },

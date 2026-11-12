@@ -1,4 +1,6 @@
-export type RollupLayout = 'cards' | 'tiles' | 'hero' | 'mosaic' | 'filmstrip' | 'list';
+export type RollupLayout = 'cards' | 'tiles' | 'hero' | 'mosaic' | 'filmstrip' | 'list' | 'spotlight' | 'social' | 'ticker';
+export type CarouselBackground = 'none' | 'theme' | 'blur' | 'color' | 'gradient';
+export type ImageQuality = 'sharp' | 'fast';
 export type HoverEffect = 'zoom' | 'lift' | 'reveal' | 'none';
 export type OverlayStyle = 'gradient' | 'glass' | 'solid';
 export type DateRange = 'all' | 'lastDays' | 'thisQuarter' | 'lastQuarter' | 'thisYear';
@@ -52,6 +54,21 @@ export interface IPageRollupWebPartProps {
   showViews: boolean;
   viewsPeriod: ViewsPeriod;
   openInNewTab: boolean;
+  imageQuality: ImageQuality;
+
+  // Carousels (spotlight, social cards, slide-up ticker)
+  carouselAutoplay: boolean;
+  carouselInterval: number;
+  carouselSpeed: number;
+  carouselPauseOnHover: boolean;
+  carouselLoop: boolean;
+  carouselArrows: boolean;
+  carouselDots: boolean;
+  carouselSlideWidth: number;
+  carouselBackground: CarouselBackground;
+  carouselBgColor: string;
+  carouselBgColor2: string;
+  tickerRows: number;
 
   // Size
   sizeMode: SizeMode;
@@ -106,8 +123,12 @@ export interface IRollupItem {
   url: string;
   title: string;
   fileType: string;
-  imageUrl: string;
-  fallbackImageUrl: string;
+  /** Full-size picture (banner image, picture column, or the file itself for images). */
+  originalImage: string;
+  /** SharePoint preview handler URL without a resolution; used for documents and the "fast" quality option. */
+  previewBase: string;
+  /** Sized thumbnail URL with a {W} placeholder for the width in pixels, when the source is a thumbnail API URL. */
+  thumbTemplate: string;
   /** Display text per internal field name. */
   values: Record<string, string>;
   viewsLifetime?: number;

@@ -86,6 +86,41 @@ declare interface IPageRollupWebPartStrings {
   AspectLabel: string;
   GapLabel: string;
   RadiusLabel: string;
+  LayoutSpotlight: string;
+  LayoutSocial: string;
+  LayoutTicker: string;
+  LayoutHelp_tiles: string;
+  LayoutHelp_cards: string;
+  LayoutHelp_hero: string;
+  LayoutHelp_mosaic: string;
+  LayoutHelp_filmstrip: string;
+  LayoutHelp_list: string;
+  LayoutHelp_spotlight: string;
+  LayoutHelp_social: string;
+  LayoutHelp_ticker: string;
+  GroupCarousel: string;
+  AutoplayLabel: string;
+  IntervalLabel: string;
+  PauseLabel: string;
+  SpeedLabel: string;
+  LoopLabel: string;
+  ArrowsLabel: string;
+  DotsLabel: string;
+  TickerRowsLabel: string;
+  SlideWidthLabel: string;
+  BackgroundLabel: string;
+  BgBlur: string;
+  BgGradient: string;
+  BgColor: string;
+  BgTheme: string;
+  BgNone: string;
+  BgColourLabel: string;
+  BgColourFrom: string;
+  BgColourTo: string;
+  ColourError: string;
+  ImageQualityLabel: string;
+  ImageSharp: string;
+  ImageFast: string;
 }
 
 declare module 'PageRollupWebPartStrings' {

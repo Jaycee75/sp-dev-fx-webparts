@@ -18,7 +18,8 @@ const SUPPORTED_FIELD_TYPES = [
 
 const ALWAYS_SELECT = ['ID', 'FileRef', 'FileLeafRef', 'FileDirRef', 'File_x0020_Type', 'Title', 'UniqueId'];
 const DEFAULT_PAGE_IMAGE = 'sitepagethumbnail.png';
-const PREVIEWABLE = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls', 'pdf', 'mp4', 'mov'];
+const IMAGE_TYPES = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
+const PREVIEWABLE = ['docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls', 'pdf', 'mp4', 'mov'];
 const OFFICE_TYPES = ['docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls', 'one'];
 
 export interface IRollupResult {
@@ -214,8 +215,9 @@ export class RollupService {
       url,
       title,
       fileType,
-      imageUrl: image.preview,
-      fallbackImageUrl: image.original,
+      originalImage: image.original,
+      previewBase: image.previewBase,
+      thumbTemplate: image.thumbTemplate,
       values
     };
   }
@@ -227,19 +229,57 @@ export class RollupService {
     absoluteFile: string,
     fileType: string,
     query: IRollupQuery
-  ): { preview: string; original: string } {
+  ): { original: string; previewBase: string; thumbTemplate: string } {
     const candidates = [query.thumbnailField, query.isPagesLibrary ? 'BannerImageUrl' : ''].filter((f) => !!f);
     for (const field of candidates) {
       const raw = this._imageFromField(row, field);
       if (raw && raw.toLowerCase().indexOf(DEFAULT_PAGE_IMAGE) === -1) {
-        const abs = raw.indexOf('http') === 0 ? raw : `${origin}${raw.indexOf('/') === 0 ? '' : '/'}${raw}`;
-        return { preview: this._preview(web, origin, abs), original: abs };
+        return this._describeImage(this._absolute(raw, origin), web, origin);
       }
     }
-    if (PREVIEWABLE.indexOf(fileType) !== -1) {
-      return { preview: `${web}/_layouts/15/getpreview.ashx?path=${encodeURIComponent(absoluteFile)}`, original: '' };
+    if (IMAGE_TYPES.indexOf(fileType) !== -1) {
+      // The item is itself a picture (e.g. a picture library)
+      return this._describeImage(absoluteFile, web, origin);
     }
-    return { preview: '', original: '' };
+    if (PREVIEWABLE.indexOf(fileType) !== -1) {
+      return { original: '', previewBase: this._previewBase(web, absoluteFile), thumbTemplate: '' };
+    }
+    return { original: '', previewBase: '', thumbTemplate: '' };
+  }
+
+  /**
+   * Banner images are often stored as an already-shrunk preview or thumbnail URL, which looks blurry on big tiles.
+   * Unwrap those to the real image, and keep a sized-thumbnail template where SharePoint gave us one.
+   */
+  private _describeImage(abs: string, web: string, origin: string): { original: string; previewBase: string; thumbTemplate: string } {
+    let original = abs;
+    let thumbTemplate = '';
+
+    // .../_layouts/15/getpreview.ashx?path=<file>&resolution=n  ->  <file>
+    const previewMatch = /getpreview\.ashx\?(?:.*&)?path=([^&]+)/i.exec(abs);
+    if (previewMatch) {
+      try {
+        original = this._absolute(decodeURIComponent(previewMatch[1]), origin);
+      } catch {
+        original = abs;
+      }
+    }
+
+    // .../thumbnails/0/c400x99999/content  ->  ask for the size we need
+    if (/\/thumbnails\/\d+\/c\d+x\d+\/content/i.test(abs)) {
+      thumbTemplate = abs.replace(/\/c\d+x\d+\/content/i, '/c{W}x99999/content');
+    }
+
+    const sameTenant = original.indexOf(origin) === 0 && original.indexOf('/_layouts/') === -1 && original.indexOf('/_api/') === -1;
+    return { original, previewBase: sameTenant ? this._previewBase(web, original) : '', thumbTemplate };
+  }
+
+  private _previewBase(web: string, absFile: string): string {
+    return `${web}/_layouts/15/getpreview.ashx?path=${encodeURIComponent(absFile)}`;
+  }
+
+  private _absolute(raw: string, origin: string): string {
+    return raw.indexOf('http') === 0 ? raw : `${origin}${raw.indexOf('/') === 0 ? '' : '/'}${raw}`;
   }
 
   private _imageFromField(row: any, field: string): string {
@@ -263,14 +303,6 @@ export class RollupService {
     // "url, description" form
     const comma = text.indexOf(', ');
     return comma > 0 && text.indexOf('http') === 0 ? text.substring(0, comma) : text;
-  }
-
-  /** Same-tenant images go through SharePoint's resizing preview handler; external ones are used as-is. */
-  private _preview(web: string, origin: string, abs: string): string {
-    if (abs.indexOf(origin) !== 0 || abs.indexOf('getpreview.ashx') !== -1 || abs.indexOf('/_layouts/') !== -1) {
-      return abs;
-    }
-    return `${web}/_layouts/15/getpreview.ashx?path=${encodeURIComponent(abs)}&resolution=3`;
   }
 
   /** Page views come from SharePoint search (ViewsLifeTime / ViewsRecent); no Graph permission needed. */

@@ -3,6 +3,7 @@ import styles from './PageRollup.module.scss';
 import { AspectRatio, HoverEffect, IRollupItem, IRollupQuery, SizeMode } from '../models/IPageRollupProps';
 import { RollupService } from '../services/RollupService';
 import { IRollupDisplay, RollupTile } from './RollupTile';
+import { ICarouselOptions, SocialCarousel, SpotlightCarousel, TickerCarousel } from './Carousels';
 
 export interface IRollupSize {
   sizeMode: SizeMode;
@@ -20,6 +21,7 @@ export interface IPageRollupProps {
   display: IRollupDisplay;
   size: IRollupSize;
   hoverEffect: HoverEffect;
+  carousel: ICarouselOptions;
   title: string;
   dateLabel: string;
   isConfigured: boolean;
@@ -53,11 +55,11 @@ function getSpan(layout: string, index: number, cols: number): { c: number; r: n
     if (index === 0 && cols === 2) return { c: 2, r: 1 };
   }
   if (layout === 'mosaic') {
+    // Repeating mix of wide and tall tiles (no single feature tile, unlike Hero)
     if (cols >= 3) {
-      const p = index % 7;
-      if (p === 0) return { c: 2, r: 2 };
-      if (p === 3) return { c: 1, r: 2 };
-      if (p === 5) return { c: 2, r: 1 };
+      const p = index % 6;
+      if (p === 0 || p === 4) return { c: 2, r: 1 };
+      if (p === 1 || p === 3) return { c: 1, r: 2 };
     } else if (cols === 2 && index % 3 === 0) {
       return { c: 2, r: 1 };
     }
@@ -87,7 +89,7 @@ function useWidth(ref: React.RefObject<HTMLDivElement>): number {
 }
 
 export const PageRollup: React.FC<IPageRollupProps> = (props) => {
-  const { service, query, display, size, hoverEffect, title, dateLabel, isConfigured, isEditMode, onConfigure, themeVars } = props;
+  const { service, query, display, size, hoverEffect, carousel, title, dateLabel, isConfigured, isEditMode, onConfigure, themeVars } = props;
   const rootRef = React.useRef<HTMLDivElement>(null);
   const stripRef = React.useRef<HTMLDivElement>(null);
   const width = useWidth(rootRef);
@@ -225,6 +227,20 @@ export const PageRollup: React.FC<IPageRollupProps> = (props) => {
       false,
       isEditMode
     );
+  } else if (layout === 'spotlight' || layout === 'social' || layout === 'ticker') {
+    if (loading) {
+      content = <div className={styles.skeleton} style={{ height: fixed ? fixedH : Math.max(200, Math.min(520, w * ratio * (layout === 'ticker' ? 0.9 : 0.6))) }} />;
+    } else {
+      const common = { items, display, options: carousel, width: w, gap, ratio, fixedHeight: fixed ? fixedH : undefined };
+      content =
+        layout === 'spotlight' ? (
+          <SpotlightCarousel {...common} />
+        ) : layout === 'social' ? (
+          <SocialCarousel {...common} visible={cols} />
+        ) : (
+          <TickerCarousel {...common} />
+        );
+    }
   } else if (layout === 'filmstrip') {
     const tileH = fixed ? fixedH - 12 : Math.max(MIN_ROW, tileW * ratio);
     content = (
@@ -243,7 +259,7 @@ export const PageRollup: React.FC<IPageRollupProps> = (props) => {
             ? Array.from({ length: Math.min(count, cols + 1) }).map((_, i) => <div key={i} className={styles.skeleton} style={{ height: tileH }} />)
             : items.map((item) => (
                 <div key={item.id} role="listitem">
-                  <RollupTile item={item} display={display} height={tileH} />
+                  <RollupTile item={item} display={display} height={tileH} imgWidth={tileW} />
                 </div>
               ))}
         </div>
@@ -260,7 +276,7 @@ export const PageRollup: React.FC<IPageRollupProps> = (props) => {
             ? Array.from({ length: count }).map((_, i) => <div key={i} className={styles.skeleton} style={{ height: rowH }} />)
             : items.map((item) => (
                 <div key={item.id} role="listitem">
-                  <RollupTile item={item} display={display} height={rowH} />
+                  <RollupTile item={item} display={display} height={rowH} imgWidth={(w - gap * (cols - 1)) / cols} />
                 </div>
               ))}
         </div>
@@ -307,6 +323,7 @@ export const PageRollup: React.FC<IPageRollupProps> = (props) => {
                       mediaRatio={ratio * 100}
                       height={isCards && fixed ? rowH : undefined}
                       large={s.c * s.r >= 4}
+                      imgWidth={tileW * s.c + gap * (s.c - 1)}
                       style={{ flex: '1 1 auto' }}
                     />
                   </div>
