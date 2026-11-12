@@ -1,6 +1,6 @@
 import * as React from 'react';
 import styles from './PageRollup.module.scss';
-import { HoverEffect, ImageQuality, IRollupItem, OverlayStyle, RollupLayout, ViewsPeriod } from '../models/IPageRollupProps';
+import { HoverEffect, ImageFit, ImageQuality, IRollupItem, OverlayStyle, RollupLayout, ViewsPeriod } from '../models/IPageRollupProps';
 import { formatCount } from '../utils/fieldValues';
 
 export interface IRollupDisplay {
@@ -15,6 +15,7 @@ export interface IRollupDisplay {
   viewsPeriod: ViewsPeriod;
   openInNewTab: boolean;
   imageQuality: ImageQuality;
+  imageFit: ImageFit;
   hoverEffect: HoverEffect;
   /** Column whose full text appears in the middle of the tile on hover (with the "reveal" effect). */
   detailsField: string;
@@ -68,7 +69,52 @@ export function hashHue(text: string): number {
   return h;
 }
 
+const DOC_COLOURS: Record<string, [string, string]> = {
+  word: ['#185abd', '#103f91'],
+  excel: ['#107c41', '#0b5a2f'],
+  powerpoint: ['#c43e1c', '#932d13'],
+  pdf: ['#d13438', '#9b1f22'],
+  onenote: ['#7719aa', '#55107a'],
+  visio: ['#3955a3', '#283d78'],
+  video: ['#323130', '#1b1a19'],
+  other: ['#5c6b7a', '#3b4652']
+};
+
+function docKind(ext: string): string {
+  if (/^(doc|docx|docm|dotx|rtf|odt)$/.test(ext)) return 'word';
+  if (/^(xls|xlsx|xlsm|xlsb|csv|ods)$/.test(ext)) return 'excel';
+  if (/^(ppt|pptx|pptm|ppsx|odp)$/.test(ext)) return 'powerpoint';
+  if (ext === 'pdf') return 'pdf';
+  if (ext === 'one') return 'onenote';
+  if (/^(vsd|vsdx)$/.test(ext)) return 'visio';
+  if (/^(mp4|mov|m4v|wmv|webm)$/.test(ext)) return 'video';
+  return 'other';
+}
+
+/** Placeholder for documents with no preview: a page icon in the file type's colour. */
+const DocPlaceholder: React.FC<{ item: IRollupItem }> = ({ item }) => {
+  const ext = (item.fileType || 'file').toLowerCase();
+  const [a, b] = DOC_COLOURS[docKind(ext)];
+  return (
+    <div className={styles.docPlaceholder} style={{ background: `linear-gradient(135deg, ${a} 0%, ${b} 100%)` }} aria-hidden="true">
+      <div className={styles.docIcon}>
+        <div className={styles.docPage}>
+          <i />
+          <i />
+          <i />
+        </div>
+        <span className={styles.docExt} style={{ background: a }}>
+          {ext.toUpperCase().slice(0, 4)}
+        </span>
+      </div>
+    </div>
+  );
+};
+
 export const Placeholder: React.FC<{ item: IRollupItem }> = ({ item }) => {
+  if (item.isDocument) {
+    return <DocPlaceholder item={item} />;
+  }
   const hue = hashHue(item.title || String(item.id));
   const initials = (item.title || '?')
     .split(/\s+/)
@@ -104,10 +150,11 @@ export function pickImageSources(item: IRollupItem, quality: ImageQuality, cssWi
   const thumb = item.thumbTemplate ? item.thumbTemplate.replace('{W}', String(Math.ceil(px / 100) * 100)) : '';
 
   const order = quality === 'fast' ? [thumb, preview, item.originalImage] : [item.originalImage, thumb, preview];
+  order.push(...(item.extraSources || []));
   return order.filter((s, i, a) => !!s && a.indexOf(s) === i);
 }
 
-export const TileImage: React.FC<{ item: IRollupItem; quality: ImageQuality; width?: number }> = ({ item, quality, width }) => {
+export const TileImage: React.FC<{ item: IRollupItem; quality: ImageQuality; width?: number; fit?: ImageFit }> = ({ item, quality, width, fit }) => {
   // Bucket the width so resizing the page doesn't keep swapping images
   const bucket = Math.ceil((width || 400) / 200) * 200;
   const sources = React.useMemo(() => pickImageSources(item, quality, bucket), [item, quality, bucket]);
@@ -117,7 +164,21 @@ export const TileImage: React.FC<{ item: IRollupItem; quality: ImageQuality; wid
   if (index >= sources.length) {
     return <Placeholder item={item} />;
   }
-  return <img src={sources[index]} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setIndex(index + 1)} />;
+  // Documents crop from the top so the title area of the first page shows; "contain" shows the whole picture
+  const imgStyle: React.CSSProperties =
+    fit === 'contain' ? { objectFit: 'contain' } : item.isDocument ? { objectPosition: 'center top' } : {};
+  return (
+    <img
+      src={sources[index]}
+      alt=""
+      loading="lazy"
+      decoding="async"
+      draggable={false}
+      className={fit === 'contain' ? styles.imgContain : undefined}
+      style={imgStyle}
+      onError={() => setIndex(index + 1)}
+    />
+  );
 };
 
 export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, mediaRatio, large, imgWidth, allowDetails = true, style }) => {
@@ -181,7 +242,7 @@ export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, 
       style={{ ...(height ? { height } : {}), ...(textBelow ? {} : { minHeight: height || 120 }), ...style }}
     >
       <div className={`${styles.media} ${textBelow ? '' : styles.mediaFill}`} style={mediaStyle}>
-        <TileImage item={item} quality={display.imageQuality} width={isList ? Math.min(220, (imgWidth || 300) * 0.3) : imgWidth} />
+        <TileImage item={item} quality={display.imageQuality} fit={display.imageFit} width={isList ? Math.min(220, (imgWidth || 300) * 0.3) : imgWidth} />
       </div>
       {showViews && typeof views === 'number' && (
         <span className={styles.views} aria-label={`${views} views`}>

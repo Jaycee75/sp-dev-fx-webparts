@@ -130,6 +130,9 @@ declare interface IPageRollupWebPartStrings {
   BgImageError: string;
   BgImageBlurLabel: string;
   BgDimLabel: string;
+  ImageFitLabel: string;
+  FitCover: string;
+  FitContain: string;
 }
 
 declare module 'PageRollupWebPartStrings' {

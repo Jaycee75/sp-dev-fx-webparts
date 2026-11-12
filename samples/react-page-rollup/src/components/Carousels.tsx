@@ -390,7 +390,7 @@ const SocialCard: React.FC<{ item: IRollupItem; display: IRollupDisplay; width: 
         </div>
       )}
       <div className={styles.socialMedia} style={{ height: mediaH }}>
-        <TileImage item={item} quality={quality} width={width} />
+        <TileImage item={item} quality={quality} width={width} fit={display.imageFit} />
         {showDetails && <DetailsPanel heading={heading} text={item.details || ''} compact={mediaH < 200} />}
       </div>
       <div className={styles.socialFoot}>

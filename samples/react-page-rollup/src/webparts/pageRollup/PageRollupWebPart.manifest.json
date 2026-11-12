@@ -23,5 +23,24 @@
       "title": "",
       "layout": "tiles"
     }
+  },
+  {
+    "groupId": "5c03119e-3074-46fd-976b-c60198311f70", // Advanced
+    "group": { "default": "Advanced" },
+    "title": { "default": "Document Rollup" },
+    "description": { "default": "Show documents from a library as preview tiles (Word, Excel, PowerPoint, PDF and more), with column filters and date ranges." },
+    "iconImageUrl": "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA2NCA2NCI+PHJlY3QgeD0iNCIgeT0iOCIgd2lkdGg9IjI2IiBoZWlnaHQ9IjIyIiByeD0iNSIgZmlsbD0iIzE4NWFiZCIvPjxyZWN0IHg9IjM0IiB5PSI4IiB3aWR0aD0iMjYiIGhlaWdodD0iMjIiIHJ4PSI1IiBmaWxsPSIjMTA3YzQxIi8+PHJlY3QgeD0iNCIgeT0iMzQiIHdpZHRoPSIyNiIgaGVpZ2h0PSIyMiIgcng9IjUiIGZpbGw9IiNjNDNlMWMiLz48cmVjdCB4PSIzNCIgeT0iMzQiIHdpZHRoPSIyNiIgaGVpZ2h0PSIyMiIgcng9IjUiIGZpbGw9IiNkMTM0MzgiLz48cGF0aCBkPSJNMTIgMTJoN2w0IDR2MTFIMTJ6IiBmaWxsPSIjZmZmIi8+PHBhdGggZD0iTTQyIDEyaDdsNCA0djExSDQyeiIgZmlsbD0iI2ZmZiIvPjxwYXRoIGQ9Ik0xMiAzOGg3bDQgNHYxMUgxMnoiIGZpbGw9IiNmZmYiLz48cGF0aCBkPSJNNDIgMzhoN2w0IDR2MTFINDJ6IiBmaWxsPSIjZmZmIi8+PC9zdmc+",
+    "properties": {
+      "title": "",
+      "startWith": "documents",
+      "layout": "cards",
+      "aspectRatio": "4:3",
+      "hoverEffect": "lift",
+      "dateField": "Modified",
+      "overlayField1": "Title",
+      "overlayField2": "Modified",
+      "detailsField": "",
+      "publishedOnly": false
+    }
   }]
 }

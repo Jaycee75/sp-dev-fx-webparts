@@ -1,6 +1,7 @@
 export type RollupLayout = 'cards' | 'tiles' | 'hero' | 'mosaic' | 'filmstrip' | 'list' | 'spotlight' | 'social' | 'ticker';
 export type CarouselBackground = 'none' | 'theme' | 'blur' | 'image' | 'color' | 'gradient';
 export type ImageQuality = 'sharp' | 'fast';
+export type ImageFit = 'cover' | 'contain';
 export type HoverEffect = 'zoom' | 'lift' | 'reveal' | 'none';
 export type OverlayStyle = 'gradient' | 'glass' | 'solid';
 export type DateRange = 'all' | 'lastDays' | 'thisQuarter' | 'lastQuarter' | 'thisYear';
@@ -56,6 +57,9 @@ export interface IPageRollupWebPartProps {
   viewsPeriod: ViewsPeriod;
   openInNewTab: boolean;
   imageQuality: ImageQuality;
+  imageFit: ImageFit;
+  /** Set by the toolbox entry: 'documents' starts on the Documents library instead of Site Pages. */
+  startWith: string;
 
   // Carousels (spotlight, social cards, slide-up ticker)
   carouselAutoplay: boolean;
@@ -134,6 +138,10 @@ export interface IRollupItem {
   previewBase: string;
   /** Sized thumbnail URL with a {W} placeholder for the width in pixels, when the source is a thumbnail API URL. */
   thumbTemplate: string;
+  /** More picture sources to try, in order, if the ones above fail (document previews). */
+  extraSources: string[];
+  /** True for files (Word, PDF, ...) rather than pages or pictures; previews show the top of the page. */
+  isDocument: boolean;
   /** Display text per internal field name. */
   values: Record<string, string>;
   /** Full text of the details column, line breaks kept (shown on hover). */

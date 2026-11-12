@@ -63,6 +63,8 @@ const DEFAULTS: Partial<IPageRollupWebPartProps> = {
   viewsPeriod: 'lifetime',
   openInNewTab: false,
   imageQuality: 'sharp',
+  imageFit: 'cover',
+  startWith: '',
   carouselAutoplay: true,
   carouselInterval: 5,
   carouselSpeed: 700,
@@ -119,7 +121,7 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
     if (!this.properties.listId) {
       try {
         const lists = await this._service.getLists(this.properties.siteUrl);
-        const pages = lists.filter((l) => l.baseTemplate === SITE_PAGES_TEMPLATE)[0];
+        const pages = this._defaultLibrary(lists);
         if (pages) {
           this.properties.listId = pages.id;
         }
@@ -179,6 +181,7 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
       viewsPeriod: p.viewsPeriod,
       openInNewTab: p.openInNewTab,
       imageQuality: p.imageQuality,
+      imageFit: p.imageFit,
       hoverEffect: p.hoverEffect,
       detailsField: p.hoverEffect === 'reveal' ? p.detailsField : ''
     };
@@ -276,6 +279,15 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
     }
   }
 
+  /** Site Pages normally; the Documents library when added from the "Document Rollup" toolbox entry. */
+  private _defaultLibrary(lists: IRollupList[]): IRollupList | undefined {
+    if (this.properties.startWith === 'documents') {
+      const docs = lists.filter((l) => l.baseTemplate === 101);
+      return docs.filter((l) => /^(documents|shared documents)$/i.test(l.title))[0] || docs[0];
+    }
+    return lists.filter((l) => l.baseTemplate === SITE_PAGES_TEMPLATE)[0];
+  }
+
   private async _loadLists(): Promise<void> {
     this._loadingLists = true;
     this._sourceError = '';
@@ -283,7 +295,7 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
     try {
       this._lists = await this._service.getLists(this.properties.siteUrl);
       if (!this.properties.listId) {
-        const pages = this._lists.filter((l) => l.baseTemplate === SITE_PAGES_TEMPLATE)[0];
+        const pages = this._defaultLibrary(this._lists);
         if (pages) {
           this.properties.listId = pages.id;
           await this._loadFields(true);
@@ -502,6 +514,13 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
       PropertyPaneDropdown('thumbnailField', {
         label: strings.ThumbnailLabel,
         options: this._fieldOptions((f) => f.type === 'Thumbnail' || f.type === 'URL', strings.ThumbnailAuto)
+      }),
+      PropertyPaneDropdown('imageFit', {
+        label: strings.ImageFitLabel,
+        options: [
+          { key: 'cover', text: strings.FitCover },
+          { key: 'contain', text: strings.FitContain }
+        ]
       }),
       PropertyPaneDropdown('imageQuality', {
         label: strings.ImageQualityLabel,

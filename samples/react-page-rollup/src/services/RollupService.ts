@@ -19,7 +19,13 @@ const SUPPORTED_FIELD_TYPES = [
 const ALWAYS_SELECT = ['ID', 'FileRef', 'FileLeafRef', 'FileDirRef', 'File_x0020_Type', 'Title', 'UniqueId'];
 const DEFAULT_PAGE_IMAGE = 'sitepagethumbnail.png';
 const IMAGE_TYPES = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
-const PREVIEWABLE = ['docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls', 'pdf', 'mp4', 'mov'];
+const PREVIEWABLE = ['docx', 'doc', 'docm', 'dotx', 'pptx', 'ppt', 'pptm', 'ppsx', 'xlsx', 'xls', 'xlsm', 'xlsb', 'pdf', 'rtf', 'odt', 'odp', 'ods', 'txt', 'csv', 'vsdx', 'one', 'mp4', 'mov', 'm4v', 'wmv', 'webm', 'heic', 'tif', 'tiff', 'svg'];
+
+interface IWebIds {
+  host: string;
+  siteId: string;
+  webId: string;
+}
 const OFFICE_TYPES = ['docx', 'doc', 'pptx', 'ppt', 'xlsx', 'xls', 'one'];
 
 export interface IRollupResult {
@@ -31,6 +37,7 @@ export interface IRollupResult {
 export class RollupService {
   private _fieldCache: Record<string, IRollupField[]> = {};
   private _listCache: Record<string, IRollupList[]> = {};
+  private _idCache: Record<string, Promise<IWebIds | undefined>> = {};
 
   constructor(private _http: SPHttpClient, private _currentWebUrl: string) {}
 
@@ -81,6 +88,7 @@ export class RollupService {
     const web = this.resolveSiteUrl(query.siteUrl);
     const origin = new URL(web).origin;
     const fields = await this.getFields(web, query.listId);
+    const ids = query.isPagesLibrary ? undefined : await this._getWebIds(web);
     const has = (name: string): boolean => fields.some((f) => f.internalName === name);
 
     const dateField = has(query.dateField) ? query.dateField : 'Created';
@@ -122,7 +130,7 @@ export class RollupService {
         if (!rowMatches(row, clientFilters, query.filterMatch)) {
           continue;
         }
-        matched.push(this._toItem(row, web, origin, query, viewFields));
+        matched.push(this._toItem(row, web, origin, query, viewFields, ids));
         if (!sortByViews && matched.length >= target) {
           break;
         }
@@ -194,7 +202,7 @@ export class RollupService {
     return `<Value Type='DateTime' IncludeTimeValue='TRUE' StorageTZ='TRUE'>${d.toISOString()}</Value>`;
   }
 
-  private _toItem(row: any, web: string, origin: string, query: IRollupQuery, viewFields: string[]): IRollupItem {
+  private _toItem(row: any, web: string, origin: string, query: IRollupQuery, viewFields: string[], ids?: IWebIds): IRollupItem {
     const fileRef: string = row.FileRef || '';
     const fileType = String(row.File_x0020_Type || fileRef.split('.').pop() || '').toLowerCase();
     const absoluteFile = `${origin}${fileRef}`;
@@ -209,7 +217,7 @@ export class RollupService {
     const title = (row.Title && String(row.Title).trim()) || fileName.replace(/\.[^.]+$/, '');
     values.Title = title;
 
-    const image = this._resolveImage(row, web, origin, absoluteFile, fileType, query);
+    const image = this._resolveImage(row, web, origin, absoluteFile, fileType, query, ids);
 
     return {
       id: Number(row.ID),
@@ -219,6 +227,8 @@ export class RollupService {
       originalImage: image.original,
       previewBase: image.previewBase,
       thumbTemplate: image.thumbTemplate,
+      extraSources: image.extraSources,
+      isDocument: image.isDocument,
       details: query.detailsField && viewFields.indexOf(query.detailsField) !== -1 ? getFieldTextMultiline(row, query.detailsField) : '',
       values
     };
@@ -230,23 +240,65 @@ export class RollupService {
     origin: string,
     absoluteFile: string,
     fileType: string,
-    query: IRollupQuery
-  ): { original: string; previewBase: string; thumbTemplate: string } {
+    query: IRollupQuery,
+    ids?: IWebIds
+  ): { original: string; previewBase: string; thumbTemplate: string; extraSources: string[]; isDocument: boolean } {
     const candidates = [query.thumbnailField, query.isPagesLibrary ? 'BannerImageUrl' : ''].filter((f) => !!f);
     for (const field of candidates) {
       const raw = this._imageFromField(row, field);
       if (raw && raw.toLowerCase().indexOf(DEFAULT_PAGE_IMAGE) === -1) {
-        return this._describeImage(this._absolute(raw, origin), web, origin);
+        return { ...this._describeImage(this._absolute(raw, origin), web, origin), extraSources: [], isDocument: false };
       }
     }
     if (IMAGE_TYPES.indexOf(fileType) !== -1) {
       // The item is itself a picture (e.g. a picture library)
-      return this._describeImage(absoluteFile, web, origin);
+      return { ...this._describeImage(absoluteFile, web, origin), extraSources: [], isDocument: false };
     }
     if (PREVIEWABLE.indexOf(fileType) !== -1) {
-      return { original: '', previewBase: this._previewBase(web, absoluteFile), thumbTemplate: '' };
+      return { ...this._documentPreview(row, web, absoluteFile, query.listId, ids), original: '', isDocument: true };
     }
-    return { original: '', previewBase: '', thumbTemplate: '' };
+    return { original: '', previewBase: '', thumbTemplate: '', extraSources: [], isDocument: true };
+  }
+
+  /**
+   * Document thumbnails, best first:
+   *  1. the thumbnail API modern SharePoint uses for its own library tiles (needs site/web ids)
+   *  2. the preview handler addressed by site/web/file ids
+   *  3. the preview handler addressed by path
+   * The tile tries each in turn if one fails, then falls back to a file-type placeholder.
+   */
+  private _documentPreview(
+    row: any,
+    web: string,
+    absoluteFile: string,
+    listId: string,
+    ids?: IWebIds
+  ): { previewBase: string; thumbTemplate: string; extraSources: string[] } {
+    const uniqueId = String(row.UniqueId || '').replace(/[{}]/g, '');
+    const clean = (g: string): string => g.replace(/[{}]/g, '');
+    const thumbTemplate = ids
+      ? `${web}/_api/v2.1/sites/${ids.host},${clean(ids.siteId)},${clean(ids.webId)}/lists/${clean(listId)}/items/${row.ID}/driveItem/thumbnails/0/c{W}x99999/content?prefer=noRedirect`
+      : '';
+    const byIds =
+      ids && uniqueId
+        ? `${web}/_layouts/15/getpreview.ashx?guidSite=${clean(ids.siteId)}&guidWeb=${clean(ids.webId)}&guidFile=${uniqueId}`
+        : '';
+    const byPath = this._previewBase(web, absoluteFile);
+    return {
+      thumbTemplate,
+      previewBase: byIds || byPath,
+      extraSources: byIds ? [`${byPath}&resolution=3`] : []
+    };
+  }
+
+  /** Site and web ids for a site address (cached), needed for document thumbnails. */
+  private _getWebIds(web: string): Promise<IWebIds | undefined> {
+    if (!this._idCache[web]) {
+      this._idCache[web] = Promise.all([this._get(`${web}/_api/site?$select=Id`), this._get(`${web}/_api/web?$select=Id`)])
+        .then(([site, w]) => ({ host: new URL(web).hostname, siteId: String(site.Id), webId: String(w.Id) }))
+        .catch(() => undefined);
+    }
+    return this._idCache[web];
   }
 
   /**

@@ -32,6 +32,21 @@ A SharePoint Framework web part that rolls up pages (or documents) from a site a
   - Also adjustable: target tile width, picture shape (16:9, 4:3, 1:1, 3:4), spacing and corner roundness.
 - Follows the site theme and section backgrounds, works on phones, and respects "reduce motion".
 
+## Document libraries
+
+Point the web part at any document library, or add **Document Rollup** from the toolbox. It's the same web part, but starts on the *Documents* library with cards, a 4:3 picture shape and *Modified* as the date column.
+
+- **Previews**: Word, Excel, PowerPoint, PDF, Visio, text files, videos and pictures get a preview of the file. The web part tries these sources in order:
+  1. the thumbnail service SharePoint uses for its own library tiles view
+  2. the preview handler, addressed by site/web/file IDs
+  3. the preview handler, addressed by path
+- **No preview available**: the tile shows an icon in the file type's colour (Word blue, Excel green, PDF red, and so on).
+- **Picture fit**:
+  - *Fill the tile* (the default) crops from the top of the first page, so the document's heading shows.
+  - *Show the whole picture or page* fits the entire page in the tile.
+- **Opening files**: Office files open in Office for the web, and other files open directly.
+- **Titles**: documents with no Title use their file name.
+
 ## Where the data comes from
 
 | What | API | Permissions |
@@ -67,4 +82,5 @@ The package is created at `sharepoint/solution/page-rollup.sppkg`. Upload it to 
 | --- | --- | --- |
 | 1.0.0 | November 2026 | Initial release |
 | 1.1.0 | November 2026 | Spotlight, card and slide-up carousels; sharper images; new mosaic pattern |
+| 1.3.0 | November 2026 | Document previews (thumbnail API with fallbacks), file-type placeholders, picture fit option, Document Rollup toolbox entry |
 | 1.2.0 | November 2026 | Hover details column (full text) in all layouts; picture background for Spotlight; card carousel arrows moved beside the dots |

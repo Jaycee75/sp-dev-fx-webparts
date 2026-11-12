@@ -601,3 +601,72 @@
 .hoverReveal .detailsHost .overlay .metaWrap {
   max-height: 0;
 }
+
+// ----- Documents ------------------------------------------------------------------
+
+// "Fit whole picture": letterbox on a soft background instead of cropping
+.imgContain {
+  background: var(--pr-border);
+  padding: 6px;
+}
+
+.docPlaceholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.6s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.docIcon {
+  position: relative;
+  width: 30%;
+  max-width: 88px;
+  min-width: 44px;
+}
+
+.docPage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  background: #fff;
+  border-radius: 4px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 9%;
+  padding: 0 16% 22%;
+  // folded corner
+  clip-path: polygon(0 0, 72% 0, 100% 21%, 100% 100%, 0 100%);
+
+  i {
+    display: block;
+    height: 5%;
+    border-radius: 2px;
+    background: #d6d6d6;
+  }
+
+  i:last-child {
+    width: 60%;
+  }
+}
+
+.docExt {
+  position: absolute;
+  top: 22%;
+  left: -14%;
+  padding: 3px 7px;
+  border-radius: 3px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
+}
+
+.hoverZoom .tile:hover .docPlaceholder,
+.hoverZoom .tile:focus-visible .docPlaceholder {
+  transform: scale(1.06);
+}

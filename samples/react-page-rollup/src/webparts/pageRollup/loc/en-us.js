@@ -63,7 +63,7 @@ define([], function() {
     "HoverReveal": "Reveal details (full text of a column)",
     "HoverNone": "Do nothing",
     "ThumbnailLabel": "Picture column",
-    "ThumbnailAuto": "Automatic (page banner or file preview)",
+    "ThumbnailAuto": "Automatic (page banner or document preview)",
     "ShowOverlayLabel": "Show text on tiles",
     "OverlayStyleLabel": "Text style",
     "OverlayGradient": "Dark gradient",
@@ -130,6 +130,9 @@ define([], function() {
     "BgImageHelp": "Upload the picture to the site (e.g. Site Assets), open it and copy its address here.",
     "BgImageError": "Enter an address starting with https:// or /",
     "BgImageBlurLabel": "Blur the background picture",
-    "BgDimLabel": "Darken the background (%)"
+    "BgDimLabel": "Darken the background (%)",
+    "ImageFitLabel": "Picture fit",
+    "FitCover": "Fill the tile (crop to fit)",
+    "FitContain": "Show the whole picture or page"
   };
 });
