@@ -8,10 +8,15 @@ A SharePoint Framework (SPFx 1.22) web part that adds a configurable **Like** bu
 - **Text**: a display text (e.g. *"Did you find this page helpful?"*) and an optional *"after liking"* text
 - **Sizing**: Small, Medium, Large, Extra large
 - **Layout**: text beside or above the button; left, centre or right aligned
-- **Style**: Filled, Outline or Subtle, with an optional custom accent colour (otherwise follows the site / section theme)
+- **Button style**: Filled, Outline or Subtle, with an optional custom accent colour (otherwise follows the site / section theme)
+- **Background**: None (transparent), Soft fill, Card (with shadow), Outline only, Frosted glass (readable over image/video sections) or Accent colour; optional custom background and text colours, corner rounding, and full-width or fit-to-content
 - **Count**: show or hide, custom singular / plural labels (`1 like`, `12 likes`, `1.2K likes`), "Liked by …" tooltip on hover
 - **Unlike**: allow or prevent users removing their like
 - Optimistic update with rollback and an error message if saving fails; keyboard and screen-reader accessible (`aria-pressed`)
+
+## Like vs. Love
+
+SharePoint pages support only **one** reaction out of the box: a single *Like* per user per page (no Love / Celebrate etc.). In *Page's built-in likes* mode the heart, star or emoji icons are just a different look for that same like count. For separate reaction counts on one page, use *SharePoint list* storage with a different *Like key* per web part.
 
 ## Where likes are stored
 
@@ -23,6 +28,14 @@ Choose in the property pane, on the **Data** page:
 | **SharePoint list** | One list item per user per *like key* (Title = key, Created By = user). Lets you have several independent Like buttons on a page, or share one count across pages by giving them the same key. Works in the workbench. | Users need **Contribute** on the list. The list (default `PageLikes`) is created automatically the first time someone with *Manage Lists* likes; or create a custom list with that name yourself. |
 
 The default like key is the page URL plus the web part instance ID. The list is queried with a `Title eq` filter; if it may grow past 5,000 items, index the **Title** column.
+
+## Troubleshooting
+
+If the button shows *"Couldn't load likes"*, edit the page: in edit mode the message includes the HTTP status and SharePoint's reason, and the full error is logged to the browser console (`[LikeWebPart]`). Common causes:
+
+- The page hasn't been published yet (save/publish it once).
+- The **social bar / page likes are turned off** for the tenant (`Set-SPOTenant -SocialBarOnSitePagesDisabled $true`) — use *SharePoint list* storage instead.
+- In list mode, the user lacks permission on the list.
 
 ## Compatibility
 

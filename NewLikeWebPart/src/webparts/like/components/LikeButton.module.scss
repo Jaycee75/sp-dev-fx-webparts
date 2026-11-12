@@ -5,6 +5,10 @@
   --like-subtle-text: #{'[theme:bodySubtext, default:#605e5c]'};
   --like-error: #{'[theme:errorText, default:#a4262c]'};
   --like-on-accent: #ffffff;
+  --like-soft-bg: #{'[theme:neutralLighter, default:#f3f2f1]'};
+  --like-card-bg: #{'[theme:bodyBackground, default:#ffffff]'};
+  --like-border: #{'[theme:neutralLight, default:#edebe9]'};
+  --like-radius: 8px;
   --like-icon: 20px;
   --like-font: 14px;
   --like-pad-y: 6px;
@@ -15,7 +19,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: var(--like-gap);
-  color: var(--like-text);
+  color: var(--like-custom-text, var(--like-text));
   font-size: var(--like-font);
   font-family: inherit;
 
@@ -55,6 +59,72 @@
 
 .text {
   font-weight: 600;
+  color: var(--like-custom-text, var(--like-text));
+}
+
+// Outer wrapper: positions a "fit to content" box according to alignment.
+.host {
+  display: flex;
+  &.left { justify-content: flex-start; }
+  &.center { justify-content: center; }
+  &.right { justify-content: flex-end; }
+}
+
+// ----- Background behind the whole web part -----
+.likeButton.container {
+  box-sizing: border-box;
+  width: 100%;
+  padding: calc(var(--like-pad-y) * 2 + 4px) calc(var(--like-pad-x) + 8px);
+  border-radius: var(--like-radius);
+  border: 1px solid transparent;
+
+  &.fit { width: auto; max-width: 100%; }
+
+  &.radius_none { --like-radius: 0; }
+  &.radius_small { --like-radius: 4px; }
+  &.radius_medium { --like-radius: 8px; }
+  &.radius_large { --like-radius: 20px; }
+}
+
+// Light neutral fill.
+.container_soft {
+  background: var(--like-bg-color, var(--like-soft-bg));
+}
+
+// White (theme background) card with border and shadow.
+.container_card {
+  background: var(--like-bg-color, var(--like-card-bg));
+  border-color: var(--like-border) !important;
+  box-shadow: 0 1.6px 3.6px rgba(0, 0, 0, 0.13), 0 0.3px 0.9px rgba(0, 0, 0, 0.11);
+}
+
+// Border only, transparent (or custom) fill.
+.container_outline {
+  background: var(--like-bg-color, transparent);
+  border-color: var(--like-border) !important;
+}
+
+// Semi-transparent blurred panel: readable over image / video backgrounds.
+.container_frosted {
+  background: color-mix(in srgb, var(--like-bg-color, var(--like-card-bg)) 72%, transparent);
+  border-color: color-mix(in srgb, var(--like-bg-color, var(--like-card-bg)) 50%, transparent) !important;
+  backdrop-filter: blur(10px) saturate(1.2);
+  -webkit-backdrop-filter: blur(10px) saturate(1.2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+// Solid accent (theme colour) fill with white text and a white button.
+.container_accent {
+  --like-accent-bg: var(--like-bg-color, var(--like-accent));
+  background: var(--like-accent-bg);
+
+  > * {
+    --like-text: #ffffff;
+    --like-subtle-text: rgba(255, 255, 255, 0.85);
+    --like-error: #ffffff;
+    --like-accent: #ffffff;
+    --like-on-accent: var(--like-accent-bg);
+  }
 }
 
 .controls {

@@ -16,10 +16,13 @@ export interface ILikeService {
 /** Error raised when the REST call fails, carrying the HTTP status. */
 export class LikeServiceError extends Error {
   public readonly status: number;
+  /** Short, human-readable reason from SharePoint (if any). */
+  public readonly reason: string;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, reason: string = '') {
     super(message);
     this.status = status;
+    this.reason = reason;
     // Keep instanceof working when targeting ES5.
     Object.setPrototypeOf(this, LikeServiceError.prototype);
   }

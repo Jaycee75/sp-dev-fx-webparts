@@ -1,5 +1,5 @@
 import { SPHttpClient } from '@microsoft/sp-http';
-import { ILikeService, ILikeState } from './ILikeService';
+import { ILikeService, ILikeState, LikeServiceError } from './ILikeService';
 import { getJson, post } from './restHelpers';
 
 interface ILikedByInformation {
@@ -20,10 +20,17 @@ export class PageLikeService implements ILikeService {
   }
 
   public async getState(): Promise<ILikeState> {
-    const info = await getJson<ILikedByInformation>(
-      this._client,
-      `${this._pageApi}/likedByInformation?$expand=likedBy`
-    );
+    let info: ILikedByInformation;
+    try {
+      info = await getJson<ILikedByInformation>(this._client, `${this._pageApi}/likedByInformation?$expand=likedBy`);
+    } catch (e) {
+      // Some tenants reject the expand; the count alone is still useful.
+      if (e instanceof LikeServiceError && e.status >= 400 && e.status < 500 && e.status !== 401 && e.status !== 403) {
+        info = await getJson<ILikedByInformation>(this._client, `${this._pageApi}/likedByInformation`);
+      } else {
+        throw e;
+      }
+    }
     return {
       count: info.likeCount || 0,
       likedByMe: !!info.isLikedByUser,

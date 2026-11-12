@@ -1,6 +1,6 @@
 import * as React from 'react';
 import * as ReactDom from 'react-dom';
-import { Version } from '@microsoft/sp-core-library';
+import { DisplayMode, Version } from '@microsoft/sp-core-library';
 import {
   IPropertyPaneConfiguration,
   IPropertyPaneField,
@@ -63,7 +63,13 @@ export default class LikeWebPart extends BaseClientSideWebPart<ILikeWebPartProps
       countLabelSingular: p.countLabelSingular ?? '',
       countLabelPlural: p.countLabelPlural ?? '',
       showLikers: !!p.showLikers,
-      allowUnlike: p.allowUnlike !== false
+      allowUnlike: p.allowUnlike !== false,
+      containerStyle: p.containerStyle || 'none',
+      backgroundColor: LikeWebPart._validColorOrUndefined(p.backgroundColor),
+      textColor: LikeWebPart._validColorOrUndefined(p.textColor),
+      cornerRadius: p.cornerRadius || 'medium',
+      containerWidth: p.containerWidth || 'full',
+      isEditMode: this.displayMode === DisplayMode.Edit
     });
 
     ReactDom.render(element, this.domElement);
@@ -102,6 +108,15 @@ export default class LikeWebPart extends BaseClientSideWebPart<ILikeWebPartProps
       return custom;
     }
     return this.properties.iconType === 'heart' ? HEART_RED : undefined;
+  }
+
+  private static _validColorOrUndefined(value: string | undefined): string | undefined {
+    const v = (value || '').trim();
+    return v && LikeWebPart._isValidColor(v) ? v : undefined;
+  }
+
+  private static _colorError(value: string): string {
+    return !value || !value.trim() || LikeWebPart._isValidColor(value.trim()) ? '' : strings.InvalidColor;
   }
 
   private static _isValidColor(value: string): boolean {
@@ -179,6 +194,54 @@ export default class LikeWebPart extends BaseClientSideWebPart<ILikeWebPartProps
     countFields.push(
       PropertyPaneToggle('showLikers', { label: strings.ShowLikersLabel, onText: strings.On, offText: strings.Off }),
       PropertyPaneToggle('allowUnlike', { label: strings.AllowUnlikeLabel, onText: strings.On, offText: strings.Off })
+    );
+
+    const backgroundFields: IPropertyPaneField<unknown>[] = [
+      PropertyPaneDropdown('containerStyle', {
+        label: strings.ContainerStyleLabel,
+        options: [
+          { key: 'none', text: strings.ContainerNone },
+          { key: 'soft', text: strings.ContainerSoft },
+          { key: 'card', text: strings.ContainerCard },
+          { key: 'outline', text: strings.ContainerOutline },
+          { key: 'frosted', text: strings.ContainerFrosted },
+          { key: 'accent', text: strings.ContainerAccent }
+        ]
+      })
+    ];
+    if (p.containerStyle && p.containerStyle !== 'none') {
+      backgroundFields.push(
+        PropertyPaneTextField('backgroundColor', {
+          label: strings.BackgroundColorLabel,
+          description: strings.BackgroundColorDescription,
+          placeholder: '#ffffff',
+          onGetErrorMessage: LikeWebPart._colorError
+        }),
+        PropertyPaneDropdown('cornerRadius', {
+          label: strings.CornerRadiusLabel,
+          options: [
+            { key: 'none', text: strings.RadiusNone },
+            { key: 'small', text: strings.RadiusSmall },
+            { key: 'medium', text: strings.RadiusMedium },
+            { key: 'large', text: strings.RadiusLarge }
+          ]
+        }),
+        PropertyPaneChoiceGroup('containerWidth', {
+          label: strings.ContainerWidthLabel,
+          options: [
+            { key: 'full', text: strings.WidthFull },
+            { key: 'fit', text: strings.WidthFit }
+          ]
+        })
+      );
+    }
+    backgroundFields.push(
+      PropertyPaneTextField('textColor', {
+        label: strings.TextColorLabel,
+        description: strings.TextColorDescription,
+        placeholder: '#323130',
+        onGetErrorMessage: LikeWebPart._colorError
+      })
     );
 
     const storageFields: IPropertyPaneField<unknown>[] = [
@@ -262,11 +325,11 @@ export default class LikeWebPart extends BaseClientSideWebPart<ILikeWebPartProps
                   label: strings.AccentColorLabel,
                   description: strings.AccentColorDescription,
                   placeholder: p.iconType === 'heart' ? HEART_RED : '#0078d4',
-                  onGetErrorMessage: (v: string) =>
-                    !v || !v.trim() || LikeWebPart._isValidColor(v.trim()) ? '' : strings.InvalidColor
+                  onGetErrorMessage: LikeWebPart._colorError
                 })
               ]
             },
+            { groupName: strings.BackgroundGroupName, groupFields: backgroundFields },
             { groupName: strings.CountGroupName, groupFields: countFields }
           ]
         },

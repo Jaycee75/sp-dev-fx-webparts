@@ -1,6 +1,9 @@
 import { ILikeService } from '../services/ILikeService';
 import {
   LikeAlignment,
+  LikeContainerStyle,
+  LikeContainerWidth,
+  LikeCornerRadius,
   LikeButtonStyle,
   LikeIconType,
   LikeLayout,
@@ -32,4 +35,14 @@ export interface ILikeButtonProps {
   countLabelPlural: string;
   showLikers: boolean;
   allowUnlike: boolean;
+
+  containerStyle: LikeContainerStyle;
+  /** Validated CSS colour or undefined. */
+  backgroundColor: string | undefined;
+  /** Validated CSS colour or undefined. */
+  textColor: string | undefined;
+  cornerRadius: LikeCornerRadius;
+  containerWidth: LikeContainerWidth;
+  /** Shows technical error details to page editors. */
+  isEditMode: boolean;
 }

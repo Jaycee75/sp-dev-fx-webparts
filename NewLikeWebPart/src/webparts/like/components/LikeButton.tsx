@@ -31,6 +31,14 @@ function format(template: string, ...args: (string | number)[]): string {
   return template.replace(/\{(\d+)\}/g, (m, i) => (args[+i] !== undefined ? String(args[+i]) : m));
 }
 
+/** Short technical detail for editors, e.g. "HTTP 404: Page not found". */
+function describeError(e: unknown): string {
+  if (e instanceof LikeServiceError) {
+    return `HTTP ${e.status}${e.reason ? ': ' + e.reason : ''}`;
+  }
+  return e instanceof Error ? e.message : String(e);
+}
+
 function likersTooltip(likers: string[], count: number): string | undefined {
   if (!likers.length) {
     return undefined;
@@ -46,11 +54,16 @@ export const LikeButton: React.FC<ILikeButtonProps> = props => {
   const [busy, setBusy] = React.useState(false);
   const [error, setError] = React.useState<string | undefined>(undefined);
   const [pop, setPop] = React.useState(false);
+  const [loadFailed, setLoadFailed] = React.useState(false);
+
+  const withDetail = (message: string, e: unknown): string =>
+    props.isEditMode ? `${message} (${describeError(e)})` : message;
 
   React.useEffect(() => {
     let cancelled = false;
     setState(undefined);
     setError(undefined);
+    setLoadFailed(false);
     if (!service) {
       return undefined;
     }
@@ -61,7 +74,8 @@ export const LikeButton: React.FC<ILikeButtonProps> = props => {
         console.error('[LikeWebPart] load failed', e);
         if (!cancelled) {
           setState({ count: 0, likedByMe: false, likers: [] });
-          setError(strings.LoadError);
+          setLoadFailed(true);
+          setError(withDetail(strings.LoadError, e));
         }
       });
     return () => {
@@ -96,18 +110,20 @@ export const LikeButton: React.FC<ILikeButtonProps> = props => {
       const fresh = liking ? await service.like() : await service.unlike();
       // If the server hasn't caught up yet, keep the optimistic view.
       setState(fresh.likedByMe === liking ? fresh : optimistic);
+      setLoadFailed(false);
     } catch (e) {
       console.error('[LikeWebPart] save failed', e);
       setState(previous);
       setError(
         e instanceof LikeServiceError && (e.status === 401 || e.status === 403)
-          ? format(strings.AccessDenied, props.listTitle)
-          : strings.SaveError
+          ? withDetail(format(strings.AccessDenied, props.listTitle), e)
+          : withDetail(strings.SaveError, e)
       );
     } finally {
       setBusy(false);
     }
-  }, [service, state, busy, props.allowUnlike, props.currentUserName, props.listTitle]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [service, state, busy, props.allowUnlike, props.currentUserName, props.listTitle, props.isEditMode]);
 
   const liked = !!state?.likedByMe;
   const text = liked && props.likedText ? props.likedText : props.displayText;
@@ -117,8 +133,11 @@ export const LikeButton: React.FC<ILikeButtonProps> = props => {
 
   const rootStyle = {
     ...props.themeVars,
-    ...(props.accentColor ? { '--like-accent': props.accentColor } : {})
+    ...(props.accentColor ? { '--like-accent': props.accentColor } : {}),
+    ...(props.backgroundColor ? { '--like-bg-color': props.backgroundColor } : {}),
+    ...(props.textColor ? { '--like-custom-text': props.textColor } : {})
   } as React.CSSProperties;
+  const hasContainer = props.containerStyle && props.containerStyle !== 'none';
 
   const ariaLabel = [
     liked ? strings.UnlikeAriaLabel : strings.LikeAriaLabel,
@@ -128,12 +147,17 @@ export const LikeButton: React.FC<ILikeButtonProps> = props => {
     .join(', ');
 
   return (
+    <div className={cx(styles.host, cls[props.alignment])}>
     <div
       className={cx(
         styles.likeButton,
         cls[props.size],
         cls[props.alignment],
-        props.layout === 'stacked' && styles.stacked
+        props.layout === 'stacked' && styles.stacked,
+        hasContainer && styles.container,
+        hasContainer && cls[`container_${props.containerStyle}`],
+        hasContainer && cls[`radius_${props.cornerRadius || 'medium'}`],
+        hasContainer && props.containerWidth === 'fit' && styles.fit
       )}
       style={rootStyle}
     >
@@ -166,7 +190,11 @@ export const LikeButton: React.FC<ILikeButtonProps> = props => {
             />
             {props.showCount && (
               <span className={styles.count} aria-live="polite">
-                {state ? `${formatCount(count)}${countLabel ? ' ' + countLabel : ''}` : strings.Loading}
+                {!state
+                  ? strings.Loading
+                  : loadFailed
+                    ? '–'
+                    : `${formatCount(count)}${countLabel ? ' ' + countLabel : ''}`}
               </span>
             )}
           </button>
@@ -177,6 +205,7 @@ export const LikeButton: React.FC<ILikeButtonProps> = props => {
           )}
         </span>
       )}
+    </div>
     </div>
   );
 };

@@ -6,6 +6,18 @@ export function odataString(value: string): string {
   return encodeURIComponent(value.replace(/'/g, "''"));
 }
 
+/** Pull the message out of a SharePoint OData error body (v3 or v4 JSON). */
+function extractReason(body: string): string {
+  try {
+    const json = JSON.parse(body);
+    const err = json['odata.error'] || json.error;
+    const msg = err?.message;
+    return (typeof msg === 'string' ? msg : msg?.value) || '';
+  } catch {
+    return '';
+  }
+}
+
 async function ensureOk(response: SPHttpClientResponse, action: string): Promise<SPHttpClientResponse> {
   if (!response.ok) {
     let detail = '';
@@ -14,7 +26,11 @@ async function ensureOk(response: SPHttpClientResponse, action: string): Promise
     } catch {
       // ignore
     }
-    throw new LikeServiceError(`${action} failed (${response.status}) ${detail}`.trim(), response.status);
+    throw new LikeServiceError(
+      `${action} failed (${response.status}) ${detail}`.trim(),
+      response.status,
+      extractReason(detail) || response.statusText || ''
+    );
   }
   return response;
 }
