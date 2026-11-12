@@ -75,6 +75,16 @@ function getSpan(layout: string, index: number, cols: number): { c: number; r: n
   return { c: 1, r: 1 };
 }
 
+/** Add ?rollupdebug=1 to the page address to see load timings in the browser console (F12). */
+function logTimings(timings: Record<string, number>, query: IRollupQuery, count: number): void {
+  try {
+    if (window.location.search.indexOf('rollupdebug=1') === -1) return;
+    console.info(`[PageRollup] ${count} items (${query.listId}, layout data) timings ms:`, timings);
+  } catch {
+    // ignore
+  }
+}
+
 function useWidth(ref: React.RefObject<HTMLDivElement>): number {
   const [width, setWidth] = React.useState(0);
   React.useEffect(() => {
@@ -140,32 +150,50 @@ export const PageRollup: React.FC<IPageRollupProps> = (props) => {
     }
 
     const run = (): void => {
+      const t0 = performance.now();
+      const timings: Record<string, number> = {};
+      const mark = (name: string): void => {
+        timings[name] = Math.round(performance.now() - t0);
+      };
+      // Previous "new" flags, so badges don't blink while they're re-checked
+      const prevNew: Record<number, boolean | undefined> = {};
+      (hit ? hit.result.items : []).forEach((i) => {
+        prevNew[i.id] = i.isNew;
+      });
+
       service
         .getItems(query, true)
         .then((result) => {
           if (cancelled) return;
-          // 2. Tiles first...
-          setItems(result.items);
+          mark('items');
+          // 2. Tiles first, with the last known view counts and "new" flags so nothing blinks...
+          const first = service.knownViews(query, result.items).map((i) => ({ ...i, isNew: prevNew[i.id] }));
+          setItems(first);
           setLoading(false);
-          service.storeResult(query, result);
-          // 3. ...then view counts (a slower search request) and "new" flags, side by side
+          service.storeResult(query, { ...result, items: first });
+          // 3. ...then fresh view counts (a slower search request) and "new" flags, side by side
           const needNew = query.newDays > 0;
-          if ((result.viewsPending || needNew) && result.items.length > 0) {
+          if ((result.viewsPending || needNew) && first.length > 0) {
             Promise.all([
-              result.viewsPending ? service.loadViews(query, result.items).catch(() => result.items) : Promise.resolve(result.items),
-              needNew ? service.loadNewFlags(query, result.items).catch(() => result.items) : Promise.resolve(result.items)
+              result.viewsPending ? service.loadViews(query, first) : Promise.resolve({ items: first, complete: true }),
+              needNew ? service.loadNewFlags(query, first).catch(() => first) : Promise.resolve(first)
             ])
-              .then(([withViews, withNew]) => {
+              .then(([views, withNew]) => {
                 if (cancelled) return;
+                mark('views+new');
                 const flags: Record<number, boolean | undefined> = {};
                 withNew.forEach((i) => {
                   flags[i.id] = i.isNew;
                 });
-                const merged = withViews.map((i) => ({ ...i, isNew: flags[i.id] }));
+                const merged = views.items.map((i) => ({ ...i, isNew: flags[i.id] }));
                 setItems(merged);
-                service.storeResult(query, { ...result, items: merged, viewsPending: false });
+                // If search failed, leave viewsPending set so the next load tries again
+                service.storeResult(query, { ...result, items: merged, viewsPending: result.viewsPending && !views.complete });
+                logTimings(timings, query, merged.length);
               })
               .catch(() => undefined);
+          } else {
+            logTimings(timings, query, first.length);
           }
         })
         .catch((e: Error) => {

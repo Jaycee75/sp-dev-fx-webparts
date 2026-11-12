@@ -78,12 +78,12 @@
 
 .spotSlide {
   position: absolute;
+  isolation: isolate;
   top: 0;
   left: 50%;
   display: flex;
   border-radius: var(--pr-radius);
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.28);
-  will-change: transform;
 
   > a {
     flex: 1 1 auto;
@@ -97,7 +97,6 @@
   top: 0;
   left: 0;
   display: flex;
-  will-change: transform;
 
   > a {
     flex: 1 1 auto;
@@ -447,4 +446,14 @@
   gap: 5px;
   margin-right: 14px;
   white-space: nowrap;
+}
+
+// Side slides are dimmed with an overlay's opacity (cheap) instead of a CSS filter (expensive to animate)
+.spotDim {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border-radius: var(--pr-radius);
+  background: #000;
+  pointer-events: none;
 }

@@ -499,9 +499,8 @@
   font-size: 12px;
   font-weight: 600;
   color: #fff;
-  background: rgba(15, 15, 15, 0.5);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  // Solid rather than frosted: a backdrop blur on every tile is expensive to repaint
+  background: rgba(15, 15, 15, 0.62);
   pointer-events: none;
 
   svg {
@@ -861,7 +860,17 @@
   background: linear-gradient(135deg, #ff3d6e 0%, #ff8a00 100%);
   box-shadow: 0 4px 14px rgba(255, 61, 110, 0.45);
   pointer-events: none;
-  animation: newPulse 2.6s ease-in-out infinite;
+
+  // Pulse a pre-drawn glow's opacity (cheap for the browser), three times, then stay still
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    box-shadow: 0 0 0 4px rgba(255, 138, 0, 0.22), 0 4px 22px rgba(255, 61, 110, 0.75);
+    opacity: 0;
+    animation: newPulse 2.4s ease-in-out 3;
+  }
 
   svg {
     width: 12px;
@@ -870,7 +879,7 @@
 }
 
 .newBadgeInline {
-  position: static;
+  position: relative;
   align-self: flex-start;
   margin-bottom: 2px;
   flex: 0 0 auto;
@@ -879,16 +888,16 @@
 @keyframes newPulse {
   0%,
   100% {
-    box-shadow: 0 4px 14px rgba(255, 61, 110, 0.45);
+    opacity: 0;
   }
   50% {
-    box-shadow: 0 4px 22px rgba(255, 61, 110, 0.8), 0 0 0 4px rgba(255, 138, 0, 0.18);
+    opacity: 1;
   }
 }
 
 // Sits at the start of the title in list rows (no extra line in a fixed-height row)
 .newBadgeInTitle {
-  position: static;
+  position: relative;
   display: inline-flex;
   vertical-align: 2px;
   margin-right: 8px;
@@ -902,23 +911,12 @@
 }
 
 .newGlow {
-  box-shadow: 0 0 0 2px #ff5a5f, 0 0 24px rgba(255, 90, 95, 0.45);
-  animation: newGlowPulse 2.6s ease-in-out infinite;
-}
-
-@keyframes newGlowPulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 2px #ff5a5f, 0 0 18px rgba(255, 90, 95, 0.35);
-  }
-  50% {
-    box-shadow: 0 0 0 2px #ff8a00, 0 0 30px rgba(255, 138, 0, 0.55);
-  }
+  // A steady glow: animating box-shadow repaints the tile every frame, which made pages sluggish
+  box-shadow: 0 0 0 2px #ff6a3d, 0 0 22px rgba(255, 90, 95, 0.42);
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .newBadge,
-  .newGlow {
+  .newBadge::after {
     animation: none;
   }
 }

@@ -241,7 +241,7 @@ const Dots: React.FC<{ count: number; index: number; go: (i: number) => void; li
 function transition(ms: number, skip: boolean, dragging: boolean): string {
   if (skip || dragging) return 'none';
   const t = `${Math.max(100, ms)}ms cubic-bezier(0.22, 0.8, 0.2, 1)`;
-  return `transform ${t}, opacity ${t}, filter ${t}`;
+  return `transform ${t}, opacity ${t}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -316,7 +316,6 @@ export const SpotlightCarousel: React.FC<ICarouselBaseProps> = ({ items, display
                 height: slideH,
                 transform: `translateX(calc(-50% + ${x + engine.drag}px)) scale(${isCurrent ? 1 : sideScale})`,
                 opacity: hidden ? 0 : 1,
-                filter: isCurrent ? 'none' : 'brightness(0.55) saturate(0.8)',
                 zIndex: 10 - abs,
                 pointerEvents: hidden ? 'none' : undefined,
                 transition: transition(options.speed, engine.jumped(i, r), engine.isDragging)
@@ -331,6 +330,11 @@ export const SpotlightCarousel: React.FC<ICarouselBaseProps> = ({ items, display
               }}
             >
               <RollupTile item={item} display={{ ...display, layout: 'tiles' }} height={slideH} large={isCurrent && slideW > 420} imgWidth={slideW} allowDetails={isCurrent} deferImage={abs > 2} />
+              <div
+                className={styles.spotDim}
+                aria-hidden="true"
+                style={{ opacity: isCurrent ? 0 : 0.45, transition: engine.isDragging ? 'none' : `opacity ${Math.max(100, options.speed)}ms ease` }}
+              />
             </div>
           );
         })}

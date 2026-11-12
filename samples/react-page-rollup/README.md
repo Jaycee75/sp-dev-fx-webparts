@@ -17,7 +17,7 @@ A SharePoint Framework web part that rolls up pages (or documents) from a site a
   - Likes and comments come from the page's own like/comment counts.
   - For document libraries, turn on *Library settings > Rating settings > Likes* to give them a likes count.
   - You can also sort by *Most liked*.
-- **Highlight new items**: items whose date column (First Published Date for pages) falls within a number of days you choose get a **NEW** badge, which can say anything you like, plus an optional glowing border. It works in every layout, including the carousels. The exact dates come from one small background request for the items shown.
+- **Highlight new items**: items whose date column (First Published Date for pages) falls within a number of days you choose get a **NEW** badge, which can say anything you like, plus an optional steady glowing border. The badge pulses three times when it appears, then stays still. It works in every layout, including the carousels. The exact dates come from one small background request for the items shown.
 - **Nine layouts**:
   - **Tiles**: equal tiles with text over the picture.
   - **Cards**: picture on top, text underneath.
@@ -80,6 +80,17 @@ Notes:
   - Carousels only load pictures for slides near the screen.
   - Autoplay pauses while the carousel is scrolled out of view.
 
+### View counts
+
+View counts come from SharePoint search, which can be slow or briefly throttled.
+- **Kept for a day:** the web part keeps each item's last known count for up to a day and shows it instantly, so counts don't blink out when tiles refresh.
+- **Re-checked every 10 minutes at most:** search is only asked again when a count is older than that.
+- **If search fails:** the web part retries once, then keeps the last known count.
+
+### Diagnosing a slow page
+
+Add `?rollupdebug=1` to the page address (or `&rollupdebug=1` if it already has a `?`). Then open the browser console (F12) to see how long each Page Rollup took to load its items, and its view counts and "new" flags.
+
 ## Build
 
 Requires Node.js 22 (`>=22.14.0 <23`).
@@ -100,6 +111,7 @@ The package is created at `sharepoint/solution/page-rollup.sppkg`. Upload it to 
 | --- | --- | --- |
 | 1.0.0 | November 2026 | Initial release |
 | 1.1.0 | November 2026 | Spotlight, card and slide-up carousels; sharper images; new mosaic pattern |
+| 1.8.0 | November 2026 | Reliable view counts (cached, retried, no blinking); no continuous animations (steady glow, 3-pulse badge); cheaper badges and spotlight dimming; ?rollupdebug=1 timings |
 | 1.7.0 | November 2026 | Highlight new items: NEW badge and optional glow for items within X days |
 | 1.6.0 | November 2026 | Performance: non-blocking start-up, no default writes (no phantom drafts), shared caches, deferred view counts, sized pictures, lazy carousel images, off-screen autoplay pause |
 | 1.5.0 | November 2026 | Likes and comments counts (with Most liked sort) alongside views |

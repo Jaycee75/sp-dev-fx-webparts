@@ -46,6 +46,14 @@ export interface IRollupResult {
 
 const META_TTL = 15 * 60 * 1000; // libraries, columns, site ids
 const RESULT_TTL = 5 * 60 * 1000; // items shown instantly from cache, then refreshed
+const VIEWS_FRESH = 10 * 60 * 1000; // view counts change slowly: re-check search at most this often
+const VIEWS_KEEP = 24 * 60 * 60 * 1000; // ...and keep showing the last known counts for up to a day
+
+interface IViewEntry {
+  life: number;
+  recent: number;
+  at: number;
+}
 const STORE_PREFIX = 'pageRollup:v1:';
 const memory: Record<string, { at: number; value: unknown }> = {};
 const inflight: Record<string, Promise<unknown>> = {};
@@ -277,10 +285,58 @@ export class RollupService {
     return items.map((i) => ({ ...i, isNew: !!isNew[i.id] }));
   }
 
-  public async loadViews(query: IRollupQuery, items: IRollupItem[]): Promise<IRollupItem[]> {
-    const copy = items.map((i) => ({ ...i }));
-    await this._attachViews(this.resolveSiteUrl(query.siteUrl), query.listId, copy, false);
-    return copy;
+  /** Items with the last known view counts filled in (instant, no request). */
+  public knownViews(query: IRollupQuery, items: IRollupItem[]): IRollupItem[] {
+    const known = this._viewCache(query);
+    const now = Date.now();
+    return items.map((i) => {
+      const k = known[i.id];
+      return k && now - k.at < VIEWS_KEEP && i.viewsLifetime === undefined ? { ...i, viewsLifetime: k.life, viewsRecent: k.recent } : i;
+    });
+  }
+
+  /**
+   * Fills in view counts from SharePoint search for items whose counts are missing or more than 10 minutes old.
+   * Never throws: if search fails (it can be slow or throttled) it retries once, then keeps the last known counts.
+   * `complete` is false when some counts could not be refreshed, so the caller can try again next time.
+   */
+  public async loadViews(query: IRollupQuery, items: IRollupItem[]): Promise<{ items: IRollupItem[]; complete: boolean }> {
+    const web = this.resolveSiteUrl(query.siteUrl);
+    const known = this._viewCache(query);
+    const now = Date.now();
+    const stale = items.filter((i) => !known[i.id] || now - known[i.id].at >= VIEWS_FRESH);
+    let complete = true;
+
+    if (stale.length > 0) {
+      const copy = stale.map((i) => ({ ...i, viewsLifetime: undefined, viewsRecent: undefined }));
+      let ok = await this._attachViews(web, query.listId, copy, false);
+      if (!ok) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1500));
+        ok = await this._attachViews(web, query.listId, copy, false);
+      }
+      if (ok) {
+        copy.forEach((i) => {
+          known[i.id] = { life: i.viewsLifetime || 0, recent: i.viewsRecent || 0, at: Date.now() };
+        });
+        writeStore(this._viewKey(query), known);
+      } else {
+        complete = false;
+      }
+    }
+
+    const result = items.map((i) => {
+      const k = known[i.id];
+      return k && now - k.at < VIEWS_KEEP ? { ...i, viewsLifetime: k.life, viewsRecent: k.recent } : { ...i };
+    });
+    return { items: result, complete };
+  }
+
+  private _viewKey(query: IRollupQuery): string {
+    return `views|${this.resolveSiteUrl(query.siteUrl)}|${query.listId}`;
+  }
+
+  private _viewCache(query: IRollupQuery): Record<number, IViewEntry> {
+    return readStore<Record<number, IViewEntry>>(this._viewKey(query), VIEWS_KEEP) || {};
   }
 
   // ---------------------------------------------------------------------------
@@ -485,9 +541,9 @@ export class RollupService {
   }
 
   /** Page views come from SharePoint search (ViewsLifeTime / ViewsRecent); no Graph permission needed. */
-  private async _attachViews(web: string, listId: string, items: IRollupItem[], wholeList: boolean): Promise<void> {
+  private async _attachViews(web: string, listId: string, items: IRollupItem[], wholeList: boolean): Promise<boolean> {
     if (items.length === 0) {
-      return;
+      return true;
     }
     const cleanListId = listId.replace(/[{}]/g, '').toLowerCase();
     let queryText = `ListId:${cleanListId}`;
@@ -525,9 +581,11 @@ export class RollupService {
         i.viewsLifetime = hit ? hit.life : 0;
         i.viewsRecent = hit ? hit.recent : 0;
       });
+      return true;
     } catch (e) {
-      // Search can be unavailable (e.g. not crawled yet); just hide the view badges.
+      // Search can be slow, throttled or briefly unavailable; the caller keeps the last known counts.
       console.warn('[PageRollup] Could not load view counts', e);
+      return false;
     }
   }
 
