@@ -121,6 +121,15 @@ declare interface IPageRollupWebPartStrings {
   ImageQualityLabel: string;
   ImageSharp: string;
   ImageFast: string;
+  DetailsFieldLabel: string;
+  DetailsNone: string;
+  DetailsHelp: string;
+  BgImage: string;
+  BgImageLabel: string;
+  BgImageHelp: string;
+  BgImageError: string;
+  BgImageBlurLabel: string;
+  BgDimLabel: string;
 }
 
 declare module 'PageRollupWebPartStrings' {

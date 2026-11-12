@@ -49,6 +49,7 @@ const DEFAULTS: Partial<IPageRollupWebPartProps> = {
   maxItems: 12,
   layout: 'tiles',
   hoverEffect: 'zoom',
+  detailsField: 'Description',
   showOverlay: true,
   overlayStyle: 'gradient',
   overlayField1: 'Title',
@@ -73,6 +74,9 @@ const DEFAULTS: Partial<IPageRollupWebPartProps> = {
   carouselBackground: 'blur',
   carouselBgColor: '#1b1f3b',
   carouselBgColor2: '#5b2a86',
+  carouselBgImage: '',
+  carouselBgImageBlur: true,
+  carouselBgDim: 40,
   tickerRows: 3,
   sizeMode: 'auto',
   fixedHeight: 480,
@@ -160,7 +164,8 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
       displayFields: overlayFields,
       thumbnailField: p.thumbnailField,
       includeViews: p.showViews,
-      viewsPeriod: p.viewsPeriod
+      viewsPeriod: p.viewsPeriod,
+      detailsField: p.hoverEffect === 'reveal' ? p.detailsField : ''
     };
 
     const display: IRollupDisplay = {
@@ -173,7 +178,9 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
       showViews: p.showViews,
       viewsPeriod: p.viewsPeriod,
       openInNewTab: p.openInNewTab,
-      imageQuality: p.imageQuality
+      imageQuality: p.imageQuality,
+      hoverEffect: p.hoverEffect,
+      detailsField: p.hoverEffect === 'reveal' ? p.detailsField : ''
     };
 
     const element: React.ReactElement<IPageRollupProps> = React.createElement(PageRollup, {
@@ -202,6 +209,9 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
         background: p.carouselBackground,
         bgColor: p.carouselBgColor,
         bgColor2: p.carouselBgColor2,
+        bgImage: p.carouselBgImage,
+        bgImageBlur: p.carouselBgImageBlur,
+        bgDim: p.carouselBgDim,
         tickerRows: p.tickerRows
       },
       title: p.title,
@@ -303,6 +313,7 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
       if (applyDefaults) {
         this.properties.overlayField2 = has('Description') ? 'Description' : has('Modified') ? 'Modified' : '';
         this.properties.thumbnailField = '';
+        this.properties.detailsField = has('Description') ? 'Description' : '';
         ['filter1Field', 'filter2Field', 'filter3Field'].forEach((k) => {
           const key = k as 'filter1Field' | 'filter2Field' | 'filter3Field';
           if (this.properties[key] && !has(this.properties[key])) {
@@ -478,6 +489,16 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
           { key: 'none', text: strings.HoverNone }
         ]
       }),
+      ...(p.hoverEffect === 'reveal'
+        ? [
+            PropertyPaneDropdown('detailsField', {
+              label: strings.DetailsFieldLabel,
+              options: this._fieldOptions((f) => f.type !== 'Thumbnail', strings.DetailsNone),
+              selectedKey: p.detailsField
+            }),
+            PropertyPaneLabel('detailsHelp', { text: strings.DetailsHelp })
+          ]
+        : []),
       PropertyPaneDropdown('thumbnailField', {
         label: strings.ThumbnailLabel,
         options: this._fieldOptions((f) => f.type === 'Thumbnail' || f.type === 'URL', strings.ThumbnailAuto)
@@ -559,6 +580,7 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
           label: strings.BackgroundLabel,
           options: [
             { key: 'blur', text: strings.BgBlur },
+            { key: 'image', text: strings.BgImage },
             { key: 'gradient', text: strings.BgGradient },
             { key: 'color', text: strings.BgColor },
             { key: 'theme', text: strings.BgTheme },
@@ -576,6 +598,22 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
             deferredValidationTime: 400
           })
         );
+      }
+      if (p.carouselBackground === 'image') {
+        carouselFields.push(
+          PropertyPaneTextField('carouselBgImage', {
+            label: strings.BgImageLabel,
+            placeholder: 'https://nats.sharepoint.com/sites/…/SiteAssets/background.jpg',
+            description: strings.BgImageHelp,
+            multiline: false,
+            deferredValidationTime: 600,
+            onGetErrorMessage: (v: string) => (!v || /^(https:\/\/|\/)/i.test(v.trim()) ? '' : strings.BgImageError)
+          }),
+          PropertyPaneToggle('carouselBgImageBlur', { label: strings.BgImageBlurLabel, onText: strings.On, offText: strings.Off })
+        );
+      }
+      if (p.carouselBackground === 'image' || p.carouselBackground === 'blur') {
+        carouselFields.push(PropertyPaneSlider('carouselBgDim', { label: strings.BgDimLabel, min: 0, max: 80, step: 5, showValue: true }));
       }
       if (p.carouselBackground === 'gradient') {
         carouselFields.push(

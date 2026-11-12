@@ -1,7 +1,7 @@
 import * as React from 'react';
 import styles from './Carousels.module.scss';
 import { CarouselBackground, ImageQuality, IRollupItem } from '../models/IPageRollupProps';
-import { EyeIcon, hashHue, IRollupDisplay, pickImageSources, RollupTile, TileImage } from './RollupTile';
+import { DetailsPanel, detailsHostClass, EyeIcon, hashHue, hasDetails, IRollupDisplay, pickImageSources, RollupTile, TileImage } from './RollupTile';
 import { formatCount } from '../utils/fieldValues';
 
 export interface ICarouselOptions {
@@ -19,6 +19,10 @@ export interface ICarouselOptions {
   background: CarouselBackground;
   bgColor: string;
   bgColor2: string;
+  /** Spotlight "image" background: picture address, whether to blur it, and how much to darken it (0-80%). */
+  bgImage: string;
+  bgImageBlur: boolean;
+  bgDim: number;
   /** Ticker: how many rows are visible at once. */
   tickerRows: number;
 }
@@ -255,9 +259,17 @@ export const SpotlightCarousel: React.FC<ICarouselBaseProps> = ({ items, display
   if (options.background === 'color') bgStyle = { background: options.bgColor || '#1b1f3b' };
   if (options.background === 'gradient')
     bgStyle = { background: `linear-gradient(135deg, ${options.bgColor || '#1b1f3b'} 0%, ${options.bgColor2 || '#3a1c71'} 100%)` };
-  if (options.background === 'blur') bgStyle = { background: '#1a1a1a' };
+  if (options.background === 'blur' || options.background === 'image') bgStyle = { background: '#1a1a1a' };
 
-  const blurSrc = options.background === 'blur' && current ? pickImageSources(current, 'fast', 400)[0] : '';
+  // Picture behind the slides: a blurred copy of the current slide, or a picture chosen in the settings
+  const bgSrc =
+    options.background === 'blur' && current
+      ? pickImageSources(current, 'fast', 400)[0] || ''
+      : options.background === 'image'
+        ? (options.bgImage || '').trim()
+        : '';
+  const bgBlur = options.background === 'blur' || options.bgImageBlur;
+  const dim = Math.max(0, Math.min(85, options.bgDim === undefined ? 40 : options.bgDim)) / 100;
 
   return (
     <div
@@ -267,9 +279,10 @@ export const SpotlightCarousel: React.FC<ICarouselBaseProps> = ({ items, display
       tabIndex={0}
       {...engine.rootProps}
     >
-      {options.background === 'blur' && (
+      {(options.background === 'blur' || options.background === 'image') && (
         <div className={styles.blurBg} aria-hidden="true">
-          {blurSrc && <img key={blurSrc} src={blurSrc} alt="" />}
+          {bgSrc && <img key={bgSrc} src={bgSrc} alt="" className={bgBlur ? styles.bgBlurred : styles.bgSharp} />}
+          <div className={styles.bgDim} style={{ background: `rgba(0, 0, 0, ${dim})` }} />
         </div>
       )}
       <div className={styles.stage} {...engine.stageProps} style={{ height: slideH, ...engine.stageProps.style }}>
@@ -303,7 +316,7 @@ export const SpotlightCarousel: React.FC<ICarouselBaseProps> = ({ items, display
                 }
               }}
             >
-              <RollupTile item={item} display={{ ...display, layout: 'tiles' }} height={slideH} large={isCurrent && slideW > 420} imgWidth={slideW} />
+              <RollupTile item={item} display={{ ...display, layout: 'tiles' }} height={slideH} large={isCurrent && slideW > 420} imgWidth={slideW} allowDetails={isCurrent} />
             </div>
           );
         })}
@@ -344,6 +357,9 @@ const SocialCard: React.FC<{ item: IRollupItem; display: IRollupDisplay; width: 
   const rest = meta.slice(2);
   const views = display.viewsPeriod === 'recent' ? item.viewsRecent : item.viewsLifetime;
   const hue = hashHue(who || heading);
+  const showDetails = hasDetails(item, display);
+  const hoverClass =
+    display.hoverEffect === 'zoom' ? styles.socialZoom : display.hoverEffect === 'lift' ? styles.socialLift : display.hoverEffect === 'reveal' ? styles.socialZoom : '';
   const initials = (who || heading)
     .split(/\s+/)
     .filter((w) => /[A-Za-z0-9]/.test(w))
@@ -353,7 +369,7 @@ const SocialCard: React.FC<{ item: IRollupItem; display: IRollupDisplay; width: 
 
   return (
     <a
-      className={styles.social}
+      className={`${styles.social} ${hoverClass} ${showDetails ? detailsHostClass : ''}`}
       href={item.url}
       target={display.openInNewTab ? '_blank' : undefined}
       rel={display.openInNewTab ? 'noopener noreferrer' : undefined}
@@ -375,6 +391,7 @@ const SocialCard: React.FC<{ item: IRollupItem; display: IRollupDisplay; width: 
       )}
       <div className={styles.socialMedia} style={{ height: mediaH }}>
         <TileImage item={item} quality={quality} width={width} />
+        {showDetails && <DetailsPanel heading={heading} text={item.details || ''} compact={mediaH < 200} />}
       </div>
       <div className={styles.socialFoot}>
         {display.showViews && typeof views === 'number' && (
@@ -402,7 +419,7 @@ export const SocialCarousel: React.FC<ICarouselBaseProps & { visible: number }> 
   const cardW = (width - gap * (shown - 1)) / shown;
   const headH = 56;
   const footH = (display.showViews ? 30 : 0) + (display.showOverlay ? 52 : 0) + 16;
-  const dotsH = options.dots && n > shown ? 28 : 0;
+  const dotsH = (options.dots || options.arrows) && n > shown ? 44 : 0;
   const cardH = fixedHeight ? Math.max(180, fixedHeight - dotsH - 8) : Math.round(headH + cardW * ratio + footH);
   const mediaH = Math.max(60, cardH - headH - footH);
   const maxIndex = Math.max(0, n - shown);
@@ -434,17 +451,22 @@ export const SocialCarousel: React.FC<ICarouselBaseProps & { visible: number }> 
           );
         })}
       </div>
-      {options.arrows && maxIndex > 0 && (
-        <>
-          <button type="button" className={`${styles.arrow} ${styles.arrowLeft} ${styles.arrowSmall}`} onClick={engine.prev} aria-label="Previous">
-            <Arrow dir="left" />
-          </button>
-          <button type="button" className={`${styles.arrow} ${styles.arrowRight} ${styles.arrowSmall}`} onClick={engine.next} aria-label="Next">
-            <Arrow dir="right" />
-          </button>
-        </>
+      {maxIndex > 0 && (options.arrows || options.dots) && (
+        // Arrows sit beside the dots under the cards so they never cover a card's text
+        <div className={styles.socialNav}>
+          {options.arrows && (
+            <button type="button" className={`${styles.navInline}`} onClick={engine.prev} aria-label="Previous">
+              <Arrow dir="left" />
+            </button>
+          )}
+          {options.dots && <Dots count={loop ? n : maxIndex + 1} index={engine.index} go={engine.go} light={false} />}
+          {options.arrows && (
+            <button type="button" className={`${styles.navInline}`} onClick={engine.next} aria-label="Next">
+              <Arrow dir="right" />
+            </button>
+          )}
+        </div>
       )}
-      {options.dots && maxIndex > 0 && <Dots count={loop ? n : maxIndex + 1} index={engine.index} go={engine.go} light={false} />}
     </div>
   );
 };

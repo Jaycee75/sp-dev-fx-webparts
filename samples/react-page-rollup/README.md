@@ -19,13 +19,13 @@ A SharePoint Framework web part that rolls up pages (or documents) from a site a
   - **Mosaic**: a magazine-style mix of wide and tall tiles, with no single feature tile.
   - **Filmstrip**: one row you scroll sideways.
   - **List**: compact rows with a small thumbnail.
-  - **Spotlight carousel**: the current slide in the middle with its neighbours peeking at the sides. The background can be a blurred copy of the current picture, a gradient, a solid colour, a light theme colour, or none.
+  - **Spotlight carousel**: the current slide in the middle with its neighbours peeking at the sides. The background can be a blurred copy of the current picture, a picture you choose (blurred or sharp), a gradient, a solid colour, a light theme colour, or none. Picture backgrounds can be darkened so the slides stand out.
   - **Card carousel**: social-media style post cards (header, picture, views, caption) sliding along. Column 2 is the card header (e.g. author) and column 3 the line under it (e.g. date).
   - **Slide-up ticker**: a column of tiles; the top one slides up and away and the next rises in from the bottom.
 - **Carousel motion**: move on automatically (seconds per item), slide speed, pause on hover, loop, arrows and dots. Every carousel can also be swiped on touch screens, dragged with the mouse, clicked, or moved with the arrow keys.
 - **Picture quality**: *Sharp* (default) uses the full-size picture. *Faster loading* uses SharePoint-resized copies sized to each tile. Banner images that SharePoint stored as small previews are unwrapped to the original picture.
 - **Three text styles**: dark gradient, frosted glass, or a solid theme-colour band.
-- **Hover effects**: zoom the picture, lift the tile, reveal extra details, or do nothing.
+- **Hover effects**: zoom the picture, lift the tile, reveal details, or do nothing. With *Reveal details* you pick a **details column** (e.g. Description). Its full text, line breaks included, appears across the middle of the tile, card or slide on hover, and long text scrolls. Works in every layout, including the carousels.
 - **Sizing**:
   - Height grows to fit, or is fixed with the tiles scaling to fill it.
   - Tiles per row is automatic (based on width) or set to 1–6.
@@ -67,3 +67,4 @@ The package is created at `sharepoint/solution/page-rollup.sppkg`. Upload it to 
 | --- | --- | --- |
 | 1.0.0 | November 2026 | Initial release |
 | 1.1.0 | November 2026 | Spotlight, card and slide-up carousels; sharper images; new mosaic pattern |
+| 1.2.0 | November 2026 | Hover details column (full text) in all layouts; picture background for Spotlight; card carousel arrows moved beside the dots |

@@ -58,6 +58,31 @@ export function getFieldValues(row: any, field: string): string[] {
   return plain ? [plain] : [];
 }
 
+/** Like getFieldText but keeps paragraph and line breaks from rich text, for the hover details panel. */
+export function getFieldTextMultiline(row: any, field: string): string {
+  const raw = row ? row[field] : undefined;
+  if (typeof raw !== 'string' || (raw.indexOf('<') === -1 && raw.indexOf('\n') === -1)) {
+    return getFieldText(row, field);
+  }
+  const withBreaks = raw
+    .replace(/\r\n?/g, '\n')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/(p|div|li|h[1-6])>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ')
+    .replace(/<[^>]+>/g, '');
+  let text = withBreaks;
+  if (decoder) {
+    decoder.innerHTML = withBreaks;
+    text = decoder.value;
+  }
+  return text
+    .split('\n')
+    .map((line) => line.replace(/[ \t\u00a0]+/g, ' ').trim())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 export function getFieldText(row: any, field: string): string {
   return getFieldValues(row, field).join(', ');
 }

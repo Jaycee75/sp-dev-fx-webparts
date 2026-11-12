@@ -1,6 +1,6 @@
 import * as React from 'react';
 import styles from './PageRollup.module.scss';
-import { ImageQuality, IRollupItem, OverlayStyle, RollupLayout, ViewsPeriod } from '../models/IPageRollupProps';
+import { HoverEffect, ImageQuality, IRollupItem, OverlayStyle, RollupLayout, ViewsPeriod } from '../models/IPageRollupProps';
 import { formatCount } from '../utils/fieldValues';
 
 export interface IRollupDisplay {
@@ -15,6 +15,27 @@ export interface IRollupDisplay {
   viewsPeriod: ViewsPeriod;
   openInNewTab: boolean;
   imageQuality: ImageQuality;
+  hoverEffect: HoverEffect;
+  /** Column whose full text appears in the middle of the tile on hover (with the "reveal" effect). */
+  detailsField: string;
+}
+
+/** Class for anything that should show a DetailsPanel when hovered or focused. */
+export const detailsHostClass = styles.detailsHost;
+
+/** Full-text panel shown across the middle of a tile/card on hover. */
+export const DetailsPanel: React.FC<{ heading: string; text: string; compact?: boolean }> = ({ heading, text, compact }) => (
+  <div className={`${styles.details} ${compact ? styles.detailsCompact : ''}`} aria-hidden="true">
+    <div className={styles.detailsInner}>
+      {heading && <p className={styles.detailsHeading}>{heading}</p>}
+      <div className={styles.detailsText}>{text}</div>
+    </div>
+  </div>
+);
+
+/** True when hovering should show the details column for this item. */
+export function hasDetails(item: IRollupItem, display: IRollupDisplay): boolean {
+  return display.hoverEffect === 'reveal' && !!display.detailsField && !!item.details;
 }
 
 export interface IRollupTileProps {
@@ -27,6 +48,8 @@ export interface IRollupTileProps {
   large?: boolean;
   /** Width the picture is drawn at, in CSS pixels; used to request a sharp enough image. */
   imgWidth?: number;
+  /** Set false to suppress the hover details panel (e.g. side slides in the spotlight). */
+  allowDetails?: boolean;
   style?: React.CSSProperties;
 }
 
@@ -97,7 +120,7 @@ export const TileImage: React.FC<{ item: IRollupItem; quality: ImageQuality; wid
   return <img src={sources[index]} alt="" loading="lazy" decoding="async" draggable={false} onError={() => setIndex(index + 1)} />;
 };
 
-export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, mediaRatio, large, imgWidth, style }) => {
+export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, mediaRatio, large, imgWidth, allowDetails = true, style }) => {
   const { layout, showOverlay, overlayStyle, overlayFields, fieldTitles, showFieldLabels, showViews, viewsPeriod } = display;
   const views = viewsPeriod === 'recent' ? item.viewsRecent : item.viewsLifetime;
   const isCard = layout === 'cards';
@@ -143,7 +166,8 @@ export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, 
         : { paddingTop: `${mediaRatio || 56.25}%` }
       : {};
 
-  const tileClass = [styles.tile, isCard ? styles.cardTile : '', isList ? styles.listTile : ''].join(' ');
+  const showDetails = allowDetails && hasDetails(item, display);
+  const tileClass = [styles.tile, isCard ? styles.cardTile : '', isList ? styles.listTile : '', showDetails ? styles.detailsHost : ''].join(' ');
 
   return (
     <a
@@ -166,6 +190,7 @@ export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, 
         </span>
       )}
       {text}
+      {showDetails && <DetailsPanel heading={heading} text={item.details || ''} compact={isList || (height !== undefined && height < 170)} />}
     </a>
   );
 };

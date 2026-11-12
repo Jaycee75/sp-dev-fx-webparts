@@ -1,7 +1,7 @@
 import { SPHttpClient, SPHttpClientResponse } from '@microsoft/sp-http';
 import { IRollupField, IRollupItem, IRollupList, IRollupQuery } from '../models/IPageRollupProps';
 import { getDateWindow } from '../utils/dateRange';
-import { getFieldText, rowMatches } from '../utils/fieldValues';
+import { getFieldText, getFieldTextMultiline, rowMatches } from '../utils/fieldValues';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
@@ -94,6 +94,7 @@ export class RollupService {
       ...(query.isPagesLibrary ? ['BannerImageUrl', 'Description'] : []),
       ...(query.thumbnailField ? [query.thumbnailField] : []),
       ...query.displayFields,
+      ...(query.detailsField ? [query.detailsField] : []),
       ...clientFilters.map((f) => f.field)
     ]).filter((f) => ALWAYS_SELECT.indexOf(f) !== -1 || has(f));
 
@@ -218,6 +219,7 @@ export class RollupService {
       originalImage: image.original,
       previewBase: image.previewBase,
       thumbTemplate: image.thumbTemplate,
+      details: query.detailsField && viewFields.indexOf(query.detailsField) !== -1 ? getFieldTextMultiline(row, query.detailsField) : '',
       values
     };
   }

@@ -60,7 +60,7 @@ define([], function() {
     "HoverLabel": "When you hover over a tile",
     "HoverZoom": "Zoom the picture",
     "HoverLift": "Lift the tile",
-    "HoverReveal": "Reveal extra details",
+    "HoverReveal": "Reveal details (full text of a column)",
     "HoverNone": "Do nothing",
     "ThumbnailLabel": "Picture column",
     "ThumbnailAuto": "Automatic (page banner or file preview)",
@@ -121,6 +121,15 @@ define([], function() {
     "ColourError": "Use a hex colour such as #1b1f3b",
     "ImageQualityLabel": "Picture quality",
     "ImageSharp": "Sharp (full-size pictures)",
-    "ImageFast": "Faster loading (SharePoint-resized pictures)"
+    "ImageFast": "Faster loading (SharePoint-resized pictures)",
+    "DetailsFieldLabel": "Details column (shown on hover)",
+    "DetailsNone": "(none - just slide up the other columns)",
+    "DetailsHelp": "When someone hovers over a tile, card or slide, this column's full text appears across the middle of it. Long text scrolls. Works with every layout.",
+    "BgImage": "A picture you choose",
+    "BgImageLabel": "Background picture address",
+    "BgImageHelp": "Upload the picture to the site (e.g. Site Assets), open it and copy its address here.",
+    "BgImageError": "Enter an address starting with https:// or /",
+    "BgImageBlurLabel": "Blur the background picture",
+    "BgDimLabel": "Darken the background (%)"
   };
 });

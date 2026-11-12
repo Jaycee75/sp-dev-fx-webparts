@@ -1,5 +1,5 @@
 export type RollupLayout = 'cards' | 'tiles' | 'hero' | 'mosaic' | 'filmstrip' | 'list' | 'spotlight' | 'social' | 'ticker';
-export type CarouselBackground = 'none' | 'theme' | 'blur' | 'color' | 'gradient';
+export type CarouselBackground = 'none' | 'theme' | 'blur' | 'image' | 'color' | 'gradient';
 export type ImageQuality = 'sharp' | 'fast';
 export type HoverEffect = 'zoom' | 'lift' | 'reveal' | 'none';
 export type OverlayStyle = 'gradient' | 'glass' | 'solid';
@@ -42,6 +42,7 @@ export interface IPageRollupWebPartProps {
   // Display
   layout: RollupLayout;
   hoverEffect: HoverEffect;
+  detailsField: string;
   showOverlay: boolean;
   overlayStyle: OverlayStyle;
   overlayField1: string;
@@ -68,6 +69,9 @@ export interface IPageRollupWebPartProps {
   carouselBackground: CarouselBackground;
   carouselBgColor: string;
   carouselBgColor2: string;
+  carouselBgImage: string;
+  carouselBgImageBlur: boolean;
+  carouselBgDim: number;
   tickerRows: number;
 
   // Size
@@ -104,6 +108,7 @@ export interface IRollupQuery {
   thumbnailField: string;
   includeViews: boolean;
   viewsPeriod: ViewsPeriod;
+  detailsField: string;
 }
 
 export interface IRollupField {
@@ -131,6 +136,8 @@ export interface IRollupItem {
   thumbTemplate: string;
   /** Display text per internal field name. */
   values: Record<string, string>;
+  /** Full text of the details column, line breaks kept (shown on hover). */
+  details?: string;
   viewsLifetime?: number;
   viewsRecent?: number;
 }
