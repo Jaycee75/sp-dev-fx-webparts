@@ -89,7 +89,7 @@ View counts come from SharePoint search, which can be slow or briefly throttled.
 
 ### Diagnosing a slow page
 
-Add `?rollupdebug=1` to the page address (or `&rollupdebug=1` if it already has a `?`). Then open the browser console (F12) to see how long each Page Rollup took to load its items, and its view counts and "new" flags.
+Add `?rollupdebug=1` to the page address (or `&rollupdebug=1` if it already has a `?`). Then open the browser console (F12). It shows the web part's version, and how long each Page Rollup took to load its items, and its view counts and "new" flags.
 
 ## Build
 
@@ -111,6 +111,7 @@ The package is created at `sharepoint/solution/page-rollup.sppkg`. Upload it to 
 | --- | --- | --- |
 | 1.0.0 | November 2026 | Initial release |
 | 1.1.0 | November 2026 | Spotlight, card and slide-up carousels; sharper images; new mosaic pattern |
+| 1.10.0 | November 2026 | Use the simple view query straight away once it has worked; ?rollupdebug=1 also logs the web part version |
 | 1.9.0 | November 2026 | Fix double-encoded picture preview paths (400 errors); view search falls back to a simpler query and pauses after repeated failures; preview handler skipped after repeated failures |
 | 1.8.0 | November 2026 | Reliable view counts (cached, retried, no blinking); no continuous animations (steady glow, 3-pulse badge); cheaper badges and spotlight dimming; ?rollupdebug=1 timings |
 | 1.7.0 | November 2026 | Highlight new items: NEW badge and optional glow for items within X days |

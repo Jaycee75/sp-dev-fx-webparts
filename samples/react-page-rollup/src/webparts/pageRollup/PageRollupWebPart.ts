@@ -116,6 +116,13 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
     // as an edit and saves a draft. Defaults are applied when reading settings (see _settings()).
 
     this._service = new RollupService(this.context.spHttpClient, this.context.pageContext.web.absoluteUrl);
+    try {
+      if (window.location.search.indexOf('rollupdebug=1') !== -1) {
+        console.info(`[PageRollup] version ${this.manifest.version} (instance ${this.instanceId})`);
+      }
+    } catch {
+      // ignore
+    }
 
     const themeProvider = this.context.serviceScope.consume(ThemeProvider.serviceKey);
     this._theme = themeProvider.tryGetTheme();
