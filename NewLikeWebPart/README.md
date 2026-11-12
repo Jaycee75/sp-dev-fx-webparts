@@ -24,7 +24,7 @@ Choose in the property pane, on the **Data** page:
 
 | Storage | How it works | Permissions |
 | --- | --- | --- |
-| **Page's built-in likes** (default) | Uses the page's own likes via `/_api/sitepages/pages({id})/like`, so the count matches the page's social bar and "Like" in the page footer. One count per page. | Anyone who can read the page. |
+| **Page's built-in likes** (default) | Uses the page's own likes via `/_api/web/lists(guid'…')/GetItemById({id})/like` and `/likedByInformation`, so the count matches the page's social bar and "Like" in the page footer. One count per page. | Anyone who can read the page. |
 | **SharePoint list** | One list item per user per *like key* (Title = key, Created By = user). Lets you have several independent Like buttons on a page, or share one count across pages by giving them the same key. Works in the workbench. | Users need **Contribute** on the list. The list (default `PageLikes`) is created automatically the first time someone with *Manage Lists* likes; or create a custom list with that name yourself. |
 
 The default like key is the page URL plus the web part instance ID. The list is queried with a `Title eq` filter; if it may grow past 5,000 items, index the **Title** column.

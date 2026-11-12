@@ -151,14 +151,15 @@ export default class LikeWebPart extends BaseClientSideWebPart<ILikeWebPartProps
     }
 
     const itemId = ctx.listItem?.id;
-    if (!itemId) {
+    const listId = ctx.list?.id?.toString();
+    if (!itemId || !listId) {
       this._service = undefined;
       this._serviceKey = undefined;
       return { unavailableMessage: strings.NoPageContext };
     }
-    const key = ['page', webUrl, itemId].join('|');
+    const key = ['page', webUrl, listId, itemId].join('|');
     if (key !== this._serviceKey) {
-      this._service = new PageLikeService(this.context.spHttpClient, webUrl, itemId);
+      this._service = new PageLikeService(this.context.spHttpClient, webUrl, listId, itemId);
       this._serviceKey = key;
     }
     return { service: this._service };
