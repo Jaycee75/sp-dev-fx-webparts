@@ -325,13 +325,14 @@ export class RollupService {
       const copy = stale.map((i) => ({ ...i, viewsLifetime: undefined, viewsRecent: undefined }));
       let ok = false;
       if (searchAvailable()) {
-        ok = await this._attachViews(web, query.listId, copy, preferSimpleViewQuery);
-        if (!ok && !preferSimpleViewQuery) {
-          // Search sometimes rejects the item-by-item query (500). Try once more with the simplest possible
-          // query: every item in the library, matched up here.
+        const startedSimple = preferSimpleViewQuery;
+        ok = await this._attachViews(web, query.listId, copy, startedSimple);
+        if (!ok) {
+          // Search sometimes rejects the item-by-item query (500), or has a brief blip. Always retry once,
+          // with the simplest possible query: every item in the library, matched up here.
           await new Promise((resolve) => window.setTimeout(resolve, 1000));
           ok = await this._attachViews(web, query.listId, copy, true);
-          if (ok) useSimpleViewQuery();
+          if (ok && !startedSimple) useSimpleViewQuery();
         }
         if (!ok) {
           // Search is having a bad time: stop asking for a few minutes (fewer errors, less load on the page)
