@@ -194,6 +194,8 @@ export const Placeholder: React.FC<{ item: IRollupItem }> = ({ item }) => {
 /** SharePoint preview handler sizes (approximate longest edge in px) for its resolution parameter. */
 const PREVIEW_SIZES = [300, 480, 750, 1024, 1600, 2560];
 
+let previewFailures = 0;
+
 function pixelTarget(quality: ImageQuality, cssWidth: number): number {
   const dpr = typeof window !== 'undefined' && window.devicePixelRatio ? Math.min(window.devicePixelRatio, 2) : 1;
   // "sharp" asks for enough pixels for high-resolution screens; "fast" for standard screens
@@ -214,7 +216,13 @@ export function pickImageSources(item: IRollupItem, quality: ImageQuality, cssWi
 
   const order = quality === 'original' ? [item.originalImage, thumb, preview] : [thumb, preview, item.originalImage];
   order.push(...(item.extraSources || []));
-  return order.filter((s, i, a) => !!s && a.indexOf(s) === i);
+  const unique = order.filter((s, i, a) => !!s && a.indexOf(s) === i);
+  // If the preview handler keeps failing on this tenant, stop asking it (one wasted request per tile otherwise)
+  if (previewFailures >= 3) {
+    const withoutPreview = unique.filter((s) => s.indexOf('getpreview.ashx') === -1);
+    if (withoutPreview.length > 0) return withoutPreview;
+  }
+  return unique;
 }
 
 export const TileImage: React.FC<{ item: IRollupItem; quality: ImageQuality; width?: number; fit?: ImageFit; defer?: boolean }> = ({
@@ -254,7 +262,10 @@ export const TileImage: React.FC<{ item: IRollupItem; quality: ImageQuality; wid
       draggable={false}
       className={fit === 'contain' ? styles.imgContain : undefined}
       style={imgStyle}
-      onError={() => setIndex(index + 1)}
+      onError={() => {
+        if (sources[index].indexOf('getpreview.ashx') !== -1) previewFailures++;
+        setIndex(index + 1);
+      }}
       onLoad={(e) => {
         // A resized copy that came back much smaller than the tile would look blurry: try the next source
         const img = e.currentTarget;

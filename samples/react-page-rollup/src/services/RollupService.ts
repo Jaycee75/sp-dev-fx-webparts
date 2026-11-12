@@ -49,6 +49,15 @@ const RESULT_TTL = 5 * 60 * 1000; // items shown instantly from cache, then refr
 const VIEWS_FRESH = 10 * 60 * 1000; // view counts change slowly: re-check search at most this often
 const VIEWS_KEEP = 24 * 60 * 60 * 1000; // ...and keep showing the last known counts for up to a day
 
+const SEARCH_BACKOFF = 5 * 60 * 1000;
+let searchBackoffUntil = 0;
+function searchAvailable(): boolean {
+  return Date.now() >= searchBackoffUntil;
+}
+function pauseSearch(): void {
+  searchBackoffUntil = Date.now() + SEARCH_BACKOFF;
+}
+
 interface IViewEntry {
   life: number;
   recent: number;
@@ -309,19 +318,29 @@ export class RollupService {
 
     if (stale.length > 0) {
       const copy = stale.map((i) => ({ ...i, viewsLifetime: undefined, viewsRecent: undefined }));
-      let ok = await this._attachViews(web, query.listId, copy, false);
-      if (!ok) {
-        await new Promise((resolve) => window.setTimeout(resolve, 1500));
+      let ok = false;
+      if (searchAvailable()) {
         ok = await this._attachViews(web, query.listId, copy, false);
+        if (!ok) {
+          // Search sometimes rejects the item-by-item query (500). Try once more with the simplest possible
+          // query: every item in the library, matched up here.
+          await new Promise((resolve) => window.setTimeout(resolve, 1000));
+          ok = await this._attachViews(web, query.listId, copy, true);
+        }
+        if (!ok) {
+          // Search is having a bad time: stop asking for a few minutes (fewer errors, less load on the page)
+          pauseSearch();
+        }
       }
       if (ok) {
         copy.forEach((i) => {
-          known[i.id] = { life: i.viewsLifetime || 0, recent: i.viewsRecent || 0, at: Date.now() };
+          if (i.viewsLifetime !== undefined) {
+            known[i.id] = { life: i.viewsLifetime || 0, recent: i.viewsRecent || 0, at: Date.now() };
+          }
         });
         writeStore(this._viewKey(query), known);
-      } else {
-        complete = false;
       }
+      complete = ok && copy.every((i) => i.viewsLifetime !== undefined);
     }
 
     const result = items.map((i) => {
@@ -510,7 +529,16 @@ export class RollupService {
   }
 
   private _previewBase(web: string, absFile: string): string {
-    return `${web}/_layouts/15/getpreview.ashx?path=${encodeURIComponent(absFile)}`;
+    // Banner addresses are often already URL-encoded (e.g. "%2C" for a comma). Decode first so the path
+    // isn't encoded twice, which makes getpreview.ashx answer 400 Bad Request.
+    // decodeURIComponent, not decodeURI: decodeURI leaves %2C (comma) and %2F (slash) encoded.
+    let path = absFile;
+    try {
+      path = decodeURIComponent(absFile);
+    } catch {
+      // malformed escape: use as-is
+    }
+    return `${web}/_layouts/15/getpreview.ashx?path=${encodeURIComponent(path)}`;
   }
 
   private _absolute(raw: string, origin: string): string {
@@ -577,9 +605,11 @@ export class RollupService {
         }
       });
       items.forEach((i) => {
-        const hit = byId[String(i.id)] || byPath[this._normaliseUrl(i.url)];
-        i.viewsLifetime = hit ? hit.life : 0;
-        i.viewsRecent = hit ? hit.recent : 0;
+        const hit = byId[String(i.id)] || (i.url ? byPath[this._normaliseUrl(i.url)] : undefined);
+        // Item-by-item query: not found means search has no views for it (0).
+        // Whole-library query (max 500 results): not found may just mean it wasn't in the first 500.
+        i.viewsLifetime = hit ? hit.life : wholeList ? i.viewsLifetime : 0;
+        i.viewsRecent = hit ? hit.recent : wholeList ? i.viewsRecent : 0;
       });
       return true;
     } catch (e) {
