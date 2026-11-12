@@ -1,7 +1,7 @@
 import * as React from 'react';
 import styles from './Carousels.module.scss';
 import { CarouselBackground, ImageQuality, IRollupItem } from '../models/IPageRollupProps';
-import { DetailsPanel, detailsHostClass, getStats, hashHue, StatIcon, hasDetails, IRollupDisplay, pickImageSources, RollupTile, TileImage } from './RollupTile';
+import { DetailsPanel, detailsHostClass, getStats, hashHue, isHighlighted, NewBadge, newGlowClass, StatIcon, hasDetails, IRollupDisplay, pickImageSources, RollupTile, TileImage } from './RollupTile';
 import { formatCount } from '../utils/fieldValues';
 
 export interface ICarouselOptions {
@@ -371,6 +371,7 @@ const SocialCard: React.FC<{ item: IRollupItem; display: IRollupDisplay; width: 
   const when = meta[1] || '';
   const rest = meta.slice(2);
   const stats = getStats(item, display);
+  const fresh = isHighlighted(item, display);
   const hue = hashHue(who || heading);
   const showDetails = hasDetails(item, display);
   const hoverClass =
@@ -384,7 +385,7 @@ const SocialCard: React.FC<{ item: IRollupItem; display: IRollupDisplay; width: 
 
   return (
     <a
-      className={`${styles.social} ${hoverClass} ${showDetails ? detailsHostClass : ''}`}
+      className={`${styles.social} ${hoverClass} ${showDetails ? detailsHostClass : ''} ${fresh && display.newGlow ? newGlowClass : ''}`}
       href={item.url}
       target={display.openInNewTab ? '_blank' : undefined}
       rel={display.openInNewTab ? 'noopener noreferrer' : undefined}
@@ -402,10 +403,12 @@ const SocialCard: React.FC<{ item: IRollupItem; display: IRollupDisplay; width: 
             <b>{who}</b>
             {when && <small>{when}</small>}
           </span>
+          {fresh && <NewBadge label={display.newLabel} inline />}
         </div>
       )}
       <div className={styles.socialMedia} style={{ height: mediaH }}>
         <TileImage item={item} quality={quality} width={width} fit={display.imageFit} defer={defer} />
+        {fresh && !who && <NewBadge label={display.newLabel} />}
         {showDetails && <DetailsPanel heading={heading} text={item.details || ''} compact={mediaH < 200} />}
       </div>
       <div className={styles.socialFoot}>

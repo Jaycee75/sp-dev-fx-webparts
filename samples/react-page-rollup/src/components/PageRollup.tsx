@@ -148,14 +148,22 @@ export const PageRollup: React.FC<IPageRollupProps> = (props) => {
           setItems(result.items);
           setLoading(false);
           service.storeResult(query, result);
-          // 3. ...then view counts, which come from a slower search request
-          if (result.viewsPending && result.items.length > 0) {
-            service
-              .loadViews(query, result.items)
-              .then((withViews) => {
+          // 3. ...then view counts (a slower search request) and "new" flags, side by side
+          const needNew = query.newDays > 0;
+          if ((result.viewsPending || needNew) && result.items.length > 0) {
+            Promise.all([
+              result.viewsPending ? service.loadViews(query, result.items).catch(() => result.items) : Promise.resolve(result.items),
+              needNew ? service.loadNewFlags(query, result.items).catch(() => result.items) : Promise.resolve(result.items)
+            ])
+              .then(([withViews, withNew]) => {
                 if (cancelled) return;
-                setItems(withViews);
-                service.storeResult(query, { ...result, items: withViews, viewsPending: false });
+                const flags: Record<number, boolean | undefined> = {};
+                withNew.forEach((i) => {
+                  flags[i.id] = i.isNew;
+                });
+                const merged = withViews.map((i) => ({ ...i, isNew: flags[i.id] }));
+                setItems(merged);
+                service.storeResult(query, { ...result, items: merged, viewsPending: false });
               })
               .catch(() => undefined);
           }

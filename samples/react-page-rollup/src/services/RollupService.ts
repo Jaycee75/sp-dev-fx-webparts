@@ -253,6 +253,30 @@ export class RollupService {
   }
 
   /** Adds view counts to items already on screen (returns new objects). */
+  /**
+   * Marks items published (or created/modified, per the date column) within the last query.newDays days.
+   * Exact dates come from the REST items endpoint, because RenderListDataAsStream formats dates for the
+   * viewer's region (e.g. day/month vs month/day), which can't be parsed reliably.
+   */
+  public async loadNewFlags(query: IRollupQuery, items: IRollupItem[]): Promise<IRollupItem[]> {
+    if (!query.newDays || items.length === 0) return items;
+    const web = this.resolveSiteUrl(query.siteUrl);
+    const fields = await this.getFields(web, query.listId);
+    const has = (name: string): boolean => fields.some((f) => f.internalName === name);
+    const dateField = has(query.dateField) ? query.dateField : 'Created';
+    const filter = items.map((i) => `Id eq ${i.id}`).join(' or ');
+    const data = await this._get(
+      `${web}/_api/web/lists(guid'${query.listId.replace(/[{}]/g, '')}')/items?$select=Id,${dateField}&$filter=${encodeURIComponent(filter)}&$top=${items.length}`
+    );
+    const cutoff = Date.now() - query.newDays * 24 * 60 * 60 * 1000;
+    const isNew: Record<number, boolean> = {};
+    (data.value || []).forEach((r: any) => {
+      const t = r[dateField] ? Date.parse(r[dateField]) : NaN;
+      isNew[Number(r.Id)] = !isNaN(t) && t >= cutoff && t <= Date.now() + 60000;
+    });
+    return items.map((i) => ({ ...i, isNew: !!isNew[i.id] }));
+  }
+
   public async loadViews(query: IRollupQuery, items: IRollupItem[]): Promise<IRollupItem[]> {
     const copy = items.map((i) => ({ ...i }));
     await this._attachViews(this.resolveSiteUrl(query.siteUrl), query.listId, copy, false);

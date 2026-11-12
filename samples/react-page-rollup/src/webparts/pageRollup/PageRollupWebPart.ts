@@ -65,6 +65,10 @@ const DEFAULTS: Partial<IPageRollupWebPartProps> = {
   viewsPeriod: 'lifetime',
   showLikes: true,
   showComments: false,
+  highlightNew: false,
+  newDays: 7,
+  newLabel: 'New',
+  newGlow: true,
   openInNewTab: false,
   imageQuality: 'sharp',
   imageFit: 'cover',
@@ -205,6 +209,7 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
       thumbnailField: p.thumbnailField,
       includeViews: p.showViews,
       includeSocial: p.showLikes || p.showComments,
+      newDays: p.highlightNew ? Math.max(1, p.newDays || 7) : 0,
       viewsPeriod: p.viewsPeriod,
       detailsField: p.hoverEffect === 'reveal' ? p.detailsField : ''
     };
@@ -220,6 +225,9 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
       viewsPeriod: p.viewsPeriod,
       showLikes: p.showLikes,
       showComments: p.showComments,
+      highlightNew: p.highlightNew,
+      newLabel: (p.newLabel || '').trim() || strings.NewDefaultLabel,
+      newGlow: p.newGlow,
       openInNewTab: p.openInNewTab,
       imageQuality: p.imageQuality,
       imageFit: p.imageFit,
@@ -651,6 +659,19 @@ export default class PageRollupWebPart extends BaseClientSideWebPart<IPageRollup
     );
     if (p.showLikes || p.showComments) {
       displayFields.push(PropertyPaneLabel('socialHelp', { text: strings.SocialHelp }));
+    }
+    displayFields.push(
+      PropertyPaneHorizontalRule(),
+      PropertyPaneToggle('highlightNew', { label: strings.HighlightNewLabel, onText: strings.On, offText: strings.Off })
+    );
+    if (p.highlightNew) {
+      const dateTitle = (this._fields.filter((f) => f.internalName === p.dateField)[0] || { title: p.dateField || 'Created' }).title;
+      displayFields.push(
+        PropertyPaneSlider('newDays', { label: strings.NewDaysLabel, min: 1, max: 90, step: 1, showValue: true }),
+        PropertyPaneLabel('newHelp', { text: strings.NewHelp.replace('{0}', dateTitle) }),
+        PropertyPaneTextField('newLabel', { label: strings.NewLabelLabel, placeholder: strings.NewDefaultLabel, maxLength: 16 }),
+        PropertyPaneToggle('newGlow', { label: strings.NewGlowLabel, onText: strings.On, offText: strings.Off })
+      );
     }
     displayFields.push(PropertyPaneToggle('openInNewTab', { label: strings.NewTabLabel, onText: strings.On, offText: strings.Off }));
 

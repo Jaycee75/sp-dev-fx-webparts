@@ -61,6 +61,10 @@ export interface IPageRollupWebPartProps {
   viewsPeriod: ViewsPeriod;
   showLikes: boolean;
   showComments: boolean;
+  highlightNew: boolean;
+  newDays: number;
+  newLabel: string;
+  newGlow: boolean;
   openInNewTab: boolean;
   imageQuality: ImageQuality;
   imageFit: ImageFit;
@@ -118,6 +122,8 @@ export interface IRollupQuery {
   thumbnailField: string;
   includeViews: boolean;
   includeSocial: boolean;
+  /** Items whose date column is within this many days count as new (0 = feature off). */
+  newDays: number;
   viewsPeriod: ViewsPeriod;
   detailsField: string;
 }
@@ -154,6 +160,8 @@ export interface IRollupItem {
   /** Full text of the details column, line breaks kept (shown on hover). */
   details?: string;
   /** Likes and comments: from the page's _LikeCount/_CommentCount, or a library's ratings 'LikesCount' column. Undefined when the library doesn't track them. */
+  /** True when the item is within the "new" period (set after the tiles first appear). */
+  isNew?: boolean;
   likes?: number;
   comments?: number;
   viewsLifetime?: number;

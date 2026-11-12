@@ -149,6 +149,12 @@ declare interface IPageRollupWebPartStrings {
   SortLikes: string;
   SocialHelp: string;
   ImageOriginal: string;
+  HighlightNewLabel: string;
+  NewDaysLabel: string;
+  NewHelp: string;
+  NewLabelLabel: string;
+  NewDefaultLabel: string;
+  NewGlowLabel: string;
 }
 
 declare module 'PageRollupWebPartStrings' {

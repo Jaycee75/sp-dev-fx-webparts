@@ -149,6 +149,12 @@ define([], function() {
     "ShowCommentsLabel": "Show comments",
     "SortLikes": "Most liked",
     "SocialHelp": "Likes and comments are shown for site pages. For a document library, turn on Library settings > Rating settings > Likes to give it a likes count. Counts appear in the corner of each tile (and under the picture on the card carousel).",
-    "ImageOriginal": "Original full-size pictures (slowest)"
+    "ImageOriginal": "Original full-size pictures (slowest)",
+    "HighlightNewLabel": "Highlight new items",
+    "NewDaysLabel": "Count as new for this many days",
+    "NewHelp": "Based on the \"{0}\" column (change it under Date range, sorting and limits). New items get a badge in the corner, in every layout including the carousels.",
+    "NewLabelLabel": "Badge text",
+    "NewDefaultLabel": "New",
+    "NewGlowLabel": "Add a glowing border to new items"
   };
 });

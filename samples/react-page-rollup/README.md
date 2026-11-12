@@ -17,6 +17,7 @@ A SharePoint Framework web part that rolls up pages (or documents) from a site a
   - Likes and comments come from the page's own like/comment counts.
   - For document libraries, turn on *Library settings > Rating settings > Likes* to give them a likes count.
   - You can also sort by *Most liked*.
+- **Highlight new items**: items whose date column (First Published Date for pages) falls within a number of days you choose get a **NEW** badge, which can say anything you like, plus an optional glowing border. It works in every layout, including the carousels. The exact dates come from one small background request for the items shown.
 - **Nine layouts**:
   - **Tiles**: equal tiles with text over the picture.
   - **Cards**: picture on top, text underneath.
@@ -99,6 +100,7 @@ The package is created at `sharepoint/solution/page-rollup.sppkg`. Upload it to 
 | --- | --- | --- |
 | 1.0.0 | November 2026 | Initial release |
 | 1.1.0 | November 2026 | Spotlight, card and slide-up carousels; sharper images; new mosaic pattern |
+| 1.7.0 | November 2026 | Highlight new items: NEW badge and optional glow for items within X days |
 | 1.6.0 | November 2026 | Performance: non-blocking start-up, no default writes (no phantom drafts), shared caches, deferred view counts, sized pictures, lazy carousel images, off-screen autoplay pause |
 | 1.5.0 | November 2026 | Likes and comments counts (with Most liked sort) alongside views |
 | 1.4.0 | November 2026 | Inline-editable heading with size and alignment toolbar |

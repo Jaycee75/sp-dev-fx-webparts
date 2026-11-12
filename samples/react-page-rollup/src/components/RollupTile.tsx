@@ -15,6 +15,10 @@ export interface IRollupDisplay {
   viewsPeriod: ViewsPeriod;
   showLikes: boolean;
   showComments: boolean;
+  /** Badge (and optional glow) on items in the "new" period. */
+  highlightNew: boolean;
+  newLabel: string;
+  newGlow: boolean;
   openInNewTab: boolean;
   imageQuality: ImageQuality;
   imageFit: ImageFit;
@@ -22,6 +26,9 @@ export interface IRollupDisplay {
   /** Column whose full text appears in the middle of the tile on hover (with the "reveal" effect). */
   detailsField: string;
 }
+
+/** Glow ring class for highlighted new items (also used by the social cards). */
+export const newGlowClass = styles.newGlow;
 
 /** Class for anything that should show a DetailsPanel when hovered or focused. */
 export const detailsHostClass = styles.detailsHost;
@@ -85,6 +92,20 @@ export function getStats(item: IRollupItem, display: IRollupDisplay): IStat[] {
   if (display.showComments && typeof item.comments === 'number')
     stats.push({ key: 'comments', value: item.comments, label: item.comments === 1 ? 'comment' : 'comments' });
   return stats;
+}
+
+/** The "New" pill. */
+export const NewBadge: React.FC<{ label: string; inline?: boolean; inTitle?: boolean }> = ({ label, inline, inTitle }) => (
+  <span className={`${styles.newBadge} ${inline ? styles.newBadgeInline : ''} ${inTitle ? styles.newBadgeInTitle : ''}`}>
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M12 2l2.4 6.6L21 11l-6.6 2.4L12 20l-2.4-6.6L3 11l6.6-2.4z" />
+    </svg>
+    {label || 'New'}
+  </span>
+);
+
+export function isHighlighted(item: IRollupItem, display: IRollupDisplay): boolean {
+  return !!display.highlightNew && !!item.isNew;
 }
 
 export const EyeIcon: React.FC = () => (
@@ -249,6 +270,7 @@ export const TileImage: React.FC<{ item: IRollupItem; quality: ImageQuality; wid
 export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, mediaRatio, large, imgWidth, allowDetails = true, deferImage, style }) => {
   const { layout, showOverlay, overlayStyle, overlayFields, fieldTitles, showFieldLabels } = display;
   const stats = getStats(item, display);
+  const fresh = isHighlighted(item, display);
   // List rows have small thumbnails, so their counts go in the text instead of a badge on the picture
   const statsInline = layout === 'list' && display.showOverlay && stats.length > 0;
   const isCard = layout === 'cards';
@@ -271,7 +293,12 @@ export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, 
             }`
       }
     >
-      {heading && <p className={`${styles.title} ${large ? styles.titleLarge : ''}`}>{heading}</p>}
+      {heading && (
+        <p className={`${styles.title} ${large ? styles.titleLarge : ''}`}>
+          {fresh && isList && <NewBadge label={display.newLabel} inTitle />}
+          {heading}
+        </p>
+      )}
       {statsInline && (
         <div className={styles.inlineStats} aria-label={stats.map((st) => `${st.value} ${st.label}`).join(', ')}>
           {stats.map((st) => (
@@ -305,7 +332,14 @@ export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, 
       : {};
 
   const showDetails = allowDetails && hasDetails(item, display);
-  const tileClass = [styles.tile, isCard ? styles.cardTile : '', isList ? styles.listTile : '', showDetails ? styles.detailsHost : ''].join(' ');
+  const tileClass = [
+    styles.tile,
+    isCard ? styles.cardTile : '',
+    isList ? styles.listTile : '',
+    showDetails ? styles.detailsHost : '',
+    fresh ? styles.isNew : '',
+    fresh && display.newGlow ? styles.newGlow : ''
+  ].join(' ');
 
   return (
     <a
@@ -314,13 +348,14 @@ export const RollupTile: React.FC<IRollupTileProps> = ({ item, display, height, 
       target={display.openInNewTab ? '_blank' : undefined}
       rel={display.openInNewTab ? 'noopener noreferrer' : undefined}
       data-interception={display.openInNewTab ? 'off' : undefined}
-      aria-label={item.title}
+      aria-label={fresh ? `${display.newLabel || 'New'}: ${item.title}` : item.title}
       title={item.title}
       style={{ ...(height ? { height } : {}), ...(textBelow ? {} : { minHeight: height || 120 }), ...style }}
     >
       <div className={`${styles.media} ${textBelow ? '' : styles.mediaFill}`} style={mediaStyle}>
         <TileImage item={item} quality={display.imageQuality} fit={display.imageFit} defer={deferImage} width={isList ? Math.min(220, (imgWidth || 300) * 0.3) : imgWidth} />
       </div>
+      {fresh && !isList && <NewBadge label={display.newLabel} />}
       {stats.length > 0 && !statsInline && (
         <span className={styles.views} aria-label={stats.map((st) => `${st.value} ${st.label}`).join(', ')}>
           {stats.map((st) => (

@@ -162,6 +162,7 @@
 
 .socialWho {
   display: flex;
+  flex: 1 1 auto; // pushes a "New" badge to the right of the header
   flex-direction: column;
   min-width: 0;
   line-height: 1.25;
